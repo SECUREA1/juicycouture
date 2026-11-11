@@ -44,15 +44,70 @@ The dashboard then polls DexScreener through the server every 30 seconds. If no 
 Requires Node.js 20 or newer and a LiveKit Cloud project to enable video.
 
 ```sh
-cp .env.example .env
-# Put your LiveKit project values in .env; never commit that file.
-set -a
-. ./.env
-set +a
-npm install
+npm ci
 npm run build
-npm start
+# Create .env only if you do not already have one:
+cp -n .env.example .env
+# Optional: enter LiveKit Cloud credentials in .env.
+node --env-file=.env server.js
 ```
+
+Do not source `.env` as a shell script: display names may contain spaces.
+
+## Docker development (including live video)
+
+```sh
+docker compose up --build -d
+# Check startup and application readiness:
+docker compose ps
+docker compose logs web livekit
+# Stop when finished:
+docker compose down
+```
+
+Compose starts the web app on port 3000 and a local LiveKit development server
+on port 7880, with TCP media on 7881 and UDP media on 7882. Access the app from
+the same machine as Docker. The browser uses `ws://localhost:7880`; the app uses
+`LIVEKIT_INTERNAL_URL=http://livekit:7880` for server-to-server room management.
+The public dev key is for local testing only. Ports bind to loopback deliberately.
+For remote/production use, deploy LiveKit with TLS, real credentials, and reachable
+media addresses/ports (or use LiveKit Cloud). Set `LIVEKIT_URL` to its public WSS
+URL and omit `LIVEKIT_INTERNAL_URL` unless you need a separate internal endpoint.
+Never publish the development LiveKit service to the Internet.
+
+For this managed cloud environment, supply the platform CA during the build:
+
+```sh
+docker compose -f compose.yaml -f compose.cloud.yaml up --build -d
+```
+
+The optional build secret extends npm trust only during installation; it is not
+stored in the image. Ordinary Docker installations can use `compose.yaml` alone.
+
+## Standalone production image
+
+```sh
+docker build -t juicy-live .
+docker run --rm --init -p 3000:3000 --env-file .env juicy-live
+```
+
+The image includes all built page assets, runs as a non-root user, and checks
+`/healthz`. Supply LiveKit Cloud credentials through runtime variables for video.
+`TOKEN_MINT` remains optional; market data needs an actual verified Solana mint
+and outbound access to `api.dexscreener.com`. No token or rewards are created by setup.
+
+## Validation
+
+```sh
+npm run build
+npm test
+# With the local Compose stack running:
+node scripts/smoke-stack.js
+```
+
+The smoke test starts the real server and checks the homepage, CSS, JavaScript,
+health, config, market-pending state, and unconfigured-video response.
+
 
 Open `http://localhost:3000`. Browser camera and microphone access requires HTTPS outside localhost. Join a room with a private room code and share its invite link only with people you want in the call. Room capacity defaults to 8 and can be set from 2 to 12 with `MAX_ROOM_PARTICIPANTS`.
 
@@ -73,6 +128,7 @@ Open `http://localhost:3000`. Browser camera and microphone access requires HTTP
 | `COIN_NETWORK` | No | Display chain; defaults to Solana. |
 | `TOKEN_MINT` | No | Verified Solana mint; blank keeps launch-pending status. |
 | `LIVEKIT_URL` | For video | LiveKit Cloud server URL. |
+| `LIVEKIT_INTERNAL_URL` | No | Server-only LiveKit HTTP endpoint; defaults to the public URL. |
 | `LIVEKIT_API_KEY` | For video | LiveKit server-side API key. |
 | `LIVEKIT_API_SECRET` | For video | LiveKit server-side API secret. Keep secret. |
 | `MAX_ROOM_PARTICIPANTS` | No | Room limit from 2 to 12; defaults to 8. |

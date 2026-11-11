@@ -31,11 +31,20 @@ function sendJson(res, status, value) {
 }
 
 function securityHeaders() {
+  // Permit only the configured local WS origin for development. Production WSS
+  // endpoints are already covered by wss: in the connection policy.
+  let localVideoSource = "";
+  try {
+    const videoUrl = new URL(process.env.LIVEKIT_URL);
+    if (videoUrl.protocol === "ws:" && ["localhost", "127.0.0.1", "[::1]"].includes(videoUrl.hostname)) {
+      localVideoSource = ` ${videoUrl.origin} ${videoUrl.origin.replace(/^ws:/, "http:")}`;
+    }
+  } catch {}
   return {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
-    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    "content-security-policy": `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:${localVideoSource}; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`,
   };
 }
 
@@ -92,7 +101,7 @@ function livekitHttpUrl(raw) {
 
 async function ensureRoom(roomName) {
   const service = new RoomServiceClient(
-    livekitHttpUrl(process.env.LIVEKIT_URL),
+    livekitHttpUrl(process.env.LIVEKIT_INTERNAL_URL || process.env.LIVEKIT_URL),
     process.env.LIVEKIT_API_KEY,
     process.env.LIVEKIT_API_SECRET,
   );
@@ -162,7 +171,7 @@ async function handle(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/room-token") {
     if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many room requests. Please wait a minute and try again." });
-    if (!livekitConfigured()) return sendJson(res, 503, { error: "Live video is not configured yet. Add LiveKit Cloud credentials in Render settings." });
+    if (!livekitConfigured()) return sendJson(res, 503, { error: "Live video is not configured yet. Add LiveKit credentials in the server environment." });
     try {
       const body = await readJson(req);
       const room = cleanRoom(body.room);

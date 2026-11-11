@@ -1,0 +1,24 @@
+# Local development only: LiveKit's built-in dev key is deliberately public.
+services:
+  web:
+    build: .
+    init: true
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_INTERNAL_URL: http://livekit:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+      MAX_ROOM_PARTICIPANTS: 8
+    depends_on:
+      - livekit
+    restart: unless-stopped
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    command: ["--dev", "--bind", "0.0.0.0", "--node-ip", "127.0.0.1"]
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "127.0.0.1:7881:7881"
+      - "127.0.0.1:7882:7882/udp"
+    restart: unless-stopped

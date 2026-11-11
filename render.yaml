@@ -2,7 +2,7 @@ services:
   - type: web
     name: juicy-couture-coin-live
     runtime: node
-    buildCommand: npm install --no-audit --no-fund && npm run build
+    buildCommand: npm ci --no-audit --no-fund && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:

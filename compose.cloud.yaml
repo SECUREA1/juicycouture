@@ -1,0 +1,9 @@
+# Supply the managed cloud proxy CA to the dependency installation step only.
+services:
+  web:
+    build:
+      secrets:
+        - proxy_ca
+secrets:
+  proxy_ca:
+    file: ${CODEX_PROXY_CERT:?CODEX_PROXY_CERT must point to the cloud proxy CA}

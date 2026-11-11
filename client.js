@@ -65,7 +65,7 @@ async function loadConfig() {
   }
   if (!config.videoReady) {
     els.join.disabled = true;
-    setStatus(els.roomStatus, "Video setup needed: add your LiveKit Cloud URL and API credentials in Render.", "pending");
+    setStatus(els.roomStatus, "Video setup needed: add your LiveKit Cloud URL and API credentials in the server environment.", "pending");
   }
   await loadMarket();
 }
@@ -120,7 +120,7 @@ function updateParticipants() {
 }
 
 function addVideoTile(identity, label, track, local = false) {
-  let tile = document.querySelector(`[data-identity="${CSS.escape(identity)}"]`);
+  let tile = els.videos.querySelector(`[data-identity="${CSS.escape(identity)}"]`);
   if (!tile) {
     tile = document.createElement("article");
     tile.className = `video-tile${local ? " self" : ""}`;
@@ -142,7 +142,7 @@ function addVideoTile(identity, label, track, local = false) {
 }
 
 function removeTile(identity) {
-  document.querySelector(`[data-identity="${CSS.escape(identity)}"]`)?.remove();
+  els.videos.querySelector(`[data-identity="${CSS.escape(identity)}"]`)?.remove();
 }
 
 async function joinRoom() {
