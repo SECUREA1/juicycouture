@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import { createTipsService } from "./tips.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = resolve("public");
@@ -18,6 +19,28 @@ const MIME = {
 };
 const rateBuckets = new Map();
 let marketCache = { expires: 0, value: null };
+const tips = createTipsService({
+  listParticipants: async (roomName) => {
+    if (!livekitConfigured()) throw new Error("Live video is not configured.");
+    const service = new RoomServiceClient(
+      livekitHttpUrl(process.env.LIVEKIT_URL),
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+    );
+    return service.listParticipants(roomName);
+  },
+});
+
+async function handleTipsRequest(req, res, operation) {
+  try {
+    return sendJson(res, 200, await operation());
+  } catch (error) {
+    return sendJson(res, error.status || 503, {
+      error: error.status ? error.message : "Token payments are temporarily unavailable. Please try again later.",
+      ...(error.signature ? { signature: error.signature } : {}),
+    });
+  }
+}
 
 function sendJson(res, status, value) {
   const body = JSON.stringify(value);
@@ -153,11 +176,37 @@ async function handle(req, res) {
       mint: String(process.env.TOKEN_MINT || "").trim() || null,
       communityUrl: process.env.COMMUNITY_URL || null,
       videoReady: livekitConfigured(),
+      tips: tips.settings(),
     });
   }
 
   if (req.method === "GET" && url.pathname === "/api/market") {
     return sendJson(res, 200, await marketData());
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/streams/")) {
+    return handleTipsRequest(req, res, () => tips.getStream(url.pathname.slice("/api/streams/".length)));
+  }
+
+  if (req.method === "POST" && ["/api/tips/prepare", "/api/tips/submit"].includes(url.pathname)) {
+    // Wallet signing never needs a cross-origin request to this application.
+    const origin = req.headers.origin;
+    if (origin) {
+      let originHost;
+      try { originHost = new URL(origin).host; } catch {}
+      if (originHost !== req.headers.host) return sendJson(res, 403, { error: "Open the payment form on this app to send tokens." });
+    }
+    if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many payment requests. Please wait a minute and try again." });
+    return handleTipsRequest(req, res, async () => {
+      let body;
+      try {
+        body = await readJson(req, 12_000);
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+      } catch {
+        throw Object.assign(new Error("Invalid payment request."), { status: 400 });
+      }
+      return url.pathname.endsWith("/prepare") ? tips.prepare(body) : tips.submit(body);
+    });
   }
 
   if (req.method === "POST" && url.pathname === "/api/room-token") {

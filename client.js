@@ -1,4 +1,5 @@
 import { Room, RoomEvent, Track } from "livekit-client";
+import { initTips } from "./tip-client.js";
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -14,6 +15,26 @@ let config = null;
 let room = null;
 let micOn = false;
 let cameraOn = false;
+const motionButton = $("#toggle-motion");
+motionButton.addEventListener("click", () => {
+  const paused = document.body.classList.toggle("motion-paused");
+  motionButton.setAttribute("aria-pressed", String(paused));
+  motionButton.textContent = paused ? "Resume motion" : "Pause motion";
+});
+const tips = initTips({ getRoom: () => room?.state === "connected" ? room.name : null });
+
+function resetRoomControls() {
+  els.videos.replaceChildren();
+  document.querySelectorAll("audio[data-identity]").forEach((audio) => audio.remove());
+  els.chatSection.classList.remove("connected");
+  for (const control of [els.leave, els.mic, els.camera, els.copy, els.chatInput, els.chatForm.querySelector("button")]) control.disabled = true;
+  els.join.disabled = !config?.videoReady;
+  $("#join-with-media").disabled = false;
+  micOn = false;
+  cameraOn = false;
+  els.participants.textContent = "Not connected";
+  tips.disconnect();
+}
 
 function setStatus(element, message, kind = "") {
   element.textContent = message;
@@ -146,6 +167,7 @@ function removeTile(identity) {
 }
 
 async function joinRoom() {
+  if (room) return;
   const name = els.displayName.value.trim().slice(0, 28);
   const roomName = normalizeRoom(els.room.value);
   if (!name) return setStatus(els.roomStatus, "Add a display name first.", "error");
@@ -191,14 +213,26 @@ async function joinRoom() {
         if (message.type === "chat" && typeof message.text === "string") addChatLine(participant?.name || "Guest", message.text.slice(0, 400));
       } catch {}
     });
-    room.on(RoomEvent.Disconnected, () => setStatus(els.roomStatus, "You left the live lounge.", "pending"));
+    const joinedRoom = room;
+    room.on(RoomEvent.Disconnected, () => {
+      if (room !== joinedRoom) return;
+      room = null;
+      resetRoomControls();
+      setStatus(els.roomStatus, "You left the live lounge.", "pending");
+    });
 
     await room.connect(auth.livekitUrl, auth.token);
-    await room.localParticipant.enableCameraAndMicrophone();
-    micOn = true;
-    cameraOn = true;
-    els.mic.textContent = "Mic on";
-    els.camera.textContent = "Camera on";
+    let mediaError = false;
+    if ($("#join-with-media").checked) {
+      try { await room.localParticipant.enableCameraAndMicrophone(); }
+      catch { mediaError = true; }
+    }
+    micOn = room.localParticipant.isMicrophoneEnabled;
+    cameraOn = room.localParticipant.isCameraEnabled;
+    els.mic.textContent = micOn ? "Mic on" : "Mic muted";
+    els.camera.textContent = cameraOn ? "Camera on" : "Camera off";
+    els.mic.setAttribute("aria-pressed", String(micOn));
+    els.camera.setAttribute("aria-pressed", String(cameraOn));
     const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     if (cameraTrack) addVideoTile(room.localParticipant.identity, auth.name, cameraTrack, true);
     els.roomTitle.textContent = `Live lounge · ${roomName}`;
@@ -209,40 +243,33 @@ async function joinRoom() {
     els.copy.disabled = false;
     els.chatInput.disabled = false;
     els.chatForm.querySelector("button").disabled = false;
-    setStatus(els.roomStatus, "You’re live. Say hello and enjoy the room.", "success");
+    $("#join-with-media").disabled = true;
+    setStatus(els.roomStatus, mediaError ? "You joined as a viewer. Check camera and microphone permissions to go live." : "You joined the lounge. Watch, chat, or turn on your camera to go live.", "success");
     updateParticipants();
+    tips.refresh();
     history.replaceState(null, "", makeInvite(roomName));
   } catch (error) {
-    if (room) {
-      for (const publication of room.localParticipant.trackPublications.values()) publication.track?.stop();
-      await room.disconnect().catch(() => {});
-    }
+    const failedRoom = room;
     room = null;
-    els.videos.replaceChildren();
+    if (failedRoom) {
+      for (const publication of failedRoom.localParticipant.trackPublications.values()) publication.track?.stop();
+      await failedRoom.disconnect().catch(() => {});
+    }
+    resetRoomControls();
     setStatus(els.roomStatus, error.message || "Could not start video. Check camera permissions and try again.", "error");
   } finally {
-    els.join.disabled = !config?.videoReady;
+    els.join.disabled = !config?.videoReady || Boolean(room);
   }
 }
 
 async function leaveRoom() {
-  if (room) {
-    for (const publication of room.localParticipant.trackPublications.values()) publication.track?.stop();
-    await room.disconnect();
-  }
+  const leavingRoom = room;
   room = null;
-  els.videos.replaceChildren();
-  document.querySelectorAll("audio[data-identity]").forEach((audio) => audio.remove());
-  els.chatSection.classList.remove("connected");
-  els.leave.disabled = true;
-  els.mic.disabled = true;
-  els.camera.disabled = true;
-  els.copy.disabled = true;
-  els.chatInput.disabled = true;
-  els.chatForm.querySelector("button").disabled = true;
-  micOn = false;
-  cameraOn = false;
-  els.participants.textContent = "Not connected";
+  if (leavingRoom) {
+    for (const publication of leavingRoom.localParticipant.trackPublications.values()) publication.track?.stop();
+    await leavingRoom.disconnect();
+  }
+  resetRoomControls();
   setStatus(els.roomStatus, "You left the live lounge.", "pending");
 }
 
@@ -250,15 +277,17 @@ els.join.addEventListener("click", joinRoom);
 els.leave.addEventListener("click", leaveRoom);
 els.mic.addEventListener("click", async () => {
   if (!room) return;
-  micOn = !micOn;
-  await room.localParticipant.setMicrophoneEnabled(micOn);
+  try { await room.localParticipant.setMicrophoneEnabled(!micOn); }
+  catch { return setStatus(els.roomStatus, "Microphone could not be enabled. Check its permissions and try again.", "error"); }
+  micOn = room.localParticipant.isMicrophoneEnabled;
   els.mic.textContent = micOn ? "Mic on" : "Mic muted";
   els.mic.setAttribute("aria-pressed", String(micOn));
 });
 els.camera.addEventListener("click", async () => {
   if (!room) return;
-  cameraOn = !cameraOn;
-  await room.localParticipant.setCameraEnabled(cameraOn);
+  try { await room.localParticipant.setCameraEnabled(!cameraOn); }
+  catch { return setStatus(els.roomStatus, "Camera could not be enabled. Check its permissions and try again.", "error"); }
+  cameraOn = room.localParticipant.isCameraEnabled;
   els.camera.textContent = cameraOn ? "Camera on" : "Camera off";
   els.camera.setAttribute("aria-pressed", String(cameraOn));
   if (!cameraOn) removeTile(room.localParticipant.identity);
@@ -266,6 +295,7 @@ els.camera.addEventListener("click", async () => {
     const track = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     if (track) addVideoTile(room.localParticipant.identity, els.displayName.value.trim() || "You", track, true);
   }
+  tips.refresh();
 });
 els.copy.addEventListener("click", async () => {
   try {
@@ -280,7 +310,11 @@ els.chatForm.addEventListener("submit", async (event) => {
   if (!room) return;
   const text = els.chatInput.value.trim().slice(0, 400);
   if (!text) return;
-  await room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: "chat", text })), { reliable: true, topic: "chat" });
+  try {
+    await room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: "chat", text })), { reliable: true, topic: "chat" });
+  } catch {
+    return setStatus(els.roomStatus, "Your message could not be sent. Check your connection and try again.", "error");
+  }
   addChatLine(els.displayName.value.trim() || "You", text, true);
   els.chatInput.value = "";
 });

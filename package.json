@@ -3,12 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "scripts": {
-    "build": "esbuild client.js --bundle --minify --platform=browser --target=es2022 --outfile=public/app.js",
-    "start": "node server.js"
+    "build": "node build.mjs",
+    "start": "node server.js",
+    "test": "node --test"
   },
   "dependencies": {
+    "@solana/spl-token": "0.4.14",
+    "@solana/web3.js": "1.98.4",
+    "bs58": "6.0.0",
+    "buffer": "6.0.3",
     "esbuild": "0.25.10",
     "livekit-client": "2.23.0",
     "livekit-server-sdk": "2.19.3"

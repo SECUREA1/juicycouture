@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#310817">
   <meta name="description" content="Juicy Couture Coin community hub, Solana token dashboard, participation rewards, and live video lounge.">
   <title>Juicy Couture Coin ($JCQ) · Live Lounge</title>
+  <link rel="icon" href="/crown.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <div class="announcement"><span>♛</span> JUICY COUTURE COIN <b>·</b> SOLANA COMMUNITY HUB <span>✦</span></div>
+  <div class="announcement"><span>♛</span> JUICY COUTURE COIN <b>·</b> SOLANA COMMUNITY HUB <span>✦</span><button id="toggle-motion" type="button" aria-pressed="false">Pause motion</button></div>
   <header class="site-header">
     <a class="brand" href="#home" aria-label="Juicy Couture Coin home"><span class="brand-mark">JC</span><span>Juicy Couture<small>Community Coin</small></span></a>
     <nav aria-label="Main navigation"><a href="#token">The coin</a><a href="#rewards">Rewards</a><a href="#live-room">Live lounge</a></nav>
@@ -24,11 +25,12 @@
         <h1>Collect the crown.<br><em>Bring the sparkle.</em></h1>
         <p>Juicy Couture Coin is an independent Solana community meme coin with an official real-life participation rewards schedule and a live room to bring the crew together.</p>
         <div class="hero-actions"><a class="button" href="#token">Meet your coin <span>✦</span></a><a class="button ghost" href="#rewards">Explore rewards</a></div>
-        <div class="hero-footnote">Mint pending · no wallet connection or purchases on this page.</div>
+        <div class="hero-footnote">Support an active stream with a token tip approved in your Solana wallet.</div>
       </div>
       <div class="hero-art" aria-hidden="true"><div class="coin-aura"></div><div class="coin"><span class="coin-crown">♛</span><strong>JC</strong><small>MEME COIN</small><i>✦</i></div><div class="gem gem-one">✧</div><div class="gem gem-two">♡</div><div class="sparkle s1">✦</div><div class="sparkle s2">✧</div></div>
     </section>
 
+    <div class="sparkle-ribbon" aria-label="Community, live lounges, and a little sparkle"><div class="ribbon-track" aria-hidden="true"><span>✦ COMMUNITY FIRST &nbsp; ♛ BRING THE SPARKLE &nbsp; ♡ LIVE TOGETHER &nbsp; ✦ SOLANA COMMUNITY &nbsp; </span><span>✦ COMMUNITY FIRST &nbsp; ♛ BRING THE SPARKLE &nbsp; ♡ LIVE TOGETHER &nbsp; ✦ SOLANA COMMUNITY &nbsp; </span></div></div>
     <section class="token-section" id="token">
       <div class="shell">
         <div class="section-title row-title"><div><div class="eyebrow">The coin · Solana</div><h2>One pretty little token.<br><em>A whole community behind it.</em></h2></div><div id="launch-status" class="launch-pill">Checking launch status…</div></div>
@@ -48,7 +50,7 @@
           <article class="reward-card featured"><div class="reward-icon">♡</div><div class="reward-amount">Up to $5</div><h3>Helping Hands / Good Vibes</h3><p>CAD-value in coin for useful event help, welcoming people, positive engagement, and thoughtful participation.</p><span class="reward-badge">Helping Heart · participation badge</span></article>
           <article class="reward-card"><div class="reward-icon">👑</div><div class="reward-amount">Up to $10</div><h3>Community Builder</h3><p>CAD-value in coin for organizing an activity, connecting people, and helping the community grow.</p><span class="reward-badge">Crown Builder · community badge</span></article>
         </div>
-        <p class="reward-rules">A gathering host verifies attendance and contributions. Only the highest eligible tier applies per person per gathering, up to $10 CAD-value; tiers do not stack. Rewards are manually reviewed and issued on published distribution dates after the token payout process is live. This page does not track balances or send rewards.</p>
+        <p class="reward-rules">A gathering host verifies attendance and contributions. Only the highest eligible tier applies per person per gathering, up to $10 CAD-value; tiers do not stack. Rewards are manually reviewed and issued on published distribution dates after the token payout process is live. Participation rewards remain manual and are separate from voluntary live-stream tips.</p>
       </div>
     </section>
 
@@ -58,10 +60,27 @@
         <div class="lounge-card">
           <div class="lounge-header"><div><div class="card-eyebrow">Live community room</div><h3 id="room-title">Your lounge is waiting</h3></div><span class="room-status-dot"></span></div>
           <div class="join-fields"><label>Display name<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="Your name in the lounge"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="juicy-breakfast"></label></div>
+          <label class="join-media-option"><input id="join-with-media" type="checkbox"> Join with camera and microphone</label>
           <div class="lounge-actions"><button id="join-room" class="button" type="button">Join live room <span>↗</span></button><button id="copy-invite" class="button ghost" type="button" disabled>Copy invite</button></div>
           <p id="room-status" class="status pending" role="status">Video setup needed. Connect a LiveKit Cloud project in Render to turn on the lounge.</p>
           <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="true">Mic on</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="true">Camera on</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
           <div id="video-grid" class="video-grid" aria-live="polite"></div>
+          <section class="tip-box" aria-labelledby="tip-heading">
+            <div class="tip-heading"><div><div class="card-eyebrow">Support the stream</div><h4 id="tip-heading">Send a little sparkle</h4></div><span aria-hidden="true">✦</span></div>
+            <p id="tip-stream-state" class="tip-note">Join a live room to send tokens.</p>
+            <div class="tip-wallet-row"><label for="tip-wallet">Your Solana wallet<select id="tip-wallet"><option value="phantom">Phantom</option><option value="solflare">Solflare</option></select></label><button id="tip-connect" class="small-button" type="button">Connect wallet</button><button id="tip-disconnect" class="small-button" type="button" disabled>Disconnect</button></div>
+            <p id="tip-account" class="tip-account">No wallet connected</p>
+            <form id="tip-form">
+              <dl class="tip-details"><div><dt>Network</dt><dd id="tip-cluster">Not configured</dd></div><div><dt>Token mint · verify the full address</dt><dd><code id="tip-mint">Mint pending</code></dd></div><div><dt>Receiving stream wallet</dt><dd><code id="tip-recipient">Not configured</code></dd></div></dl>
+              <label class="tip-amount-label" for="tip-amount">Amount in tokens<input id="tip-amount" type="text" inputmode="decimal" maxlength="40" autocomplete="off" placeholder="0.00" aria-describedby="tip-fee-note"></label>
+              <p class="tip-review">You will send <strong><output id="tip-review-amount" for="tip-amount">0</output> tokens</strong> to the wallet shown above.</p>
+              <p id="tip-fee-note" class="tip-note">Your wallet must hold this token and SOL for network fees. The first payment may also pay to create the receiving token account. Review the transaction in your wallet before approving.</p>
+              <button id="tip-send" class="button" type="submit" disabled>Send tokens <span aria-hidden="true">♡</span></button>
+            </form>
+            <p id="tip-status" class="status pending" role="status" aria-live="polite">Connect a wallet when you are ready. Every payment needs your approval.</p>
+            <p id="tip-receipt" class="tip-receipt" hidden>Transaction: <a id="tip-receipt-link" target="_blank" rel="noopener noreferrer"></a></p>
+            <button id="tip-checked" class="small-button" type="button" hidden>I checked this transaction · allow another tip</button>
+          </section>
           <div class="chat-box"><div class="chat-heading">Room chat <span>Say hi ✨</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Write a friendly message…" aria-label="Message" disabled><button class="small-button send-button" type="submit" disabled>Send</button></form></div>
         </div>
       </div>
