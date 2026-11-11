@@ -38,3 +38,5 @@ services:
         value: /var/data/community
       - key: JUPITER_API_KEY
         sync: false
+      - key: REWARD_HOST_WALLETS
+        sync: false

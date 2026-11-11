@@ -38,6 +38,8 @@ test("HTTP app serves its build and rejects unavailable token payments", async (
       SOLANA_CLUSTER: "devnet",
       SOLANA_RPC_URL: "",
       JUPITER_API_KEY: "",
+      REWARD_HOST_WALLETS: "",
+      DEFAULT_LIVE_ROOM: "juicy-live",
       MEDIA_DATA_DIR: mediaDirectory,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -97,6 +99,21 @@ test("HTTP app serves its build and rejects unavailable token payments", async (
     assert.equal(config.tips.recipient, null);
     assert.equal(config.swaps.ready, false);
     assert.equal(config.feedReady, true);
+    assert.equal(config.defaultRoom, "juicy-live");
+    assert.equal(config.drops.ready, false);
+  });
+
+  await t.test("reward drop configuration and public list do not enable unconfigured payouts", async () => {
+    const response = await request("/api/drops/config");
+    assert.equal(response.status, 200);
+    const settings = await response.json();
+    assert.equal(settings.ready, false);
+    assert.equal(settings.approvalMode, "host-approved");
+    assert.deepEqual(settings.hosts, []);
+    const list = await request("/api/drops");
+    assert.deepEqual((await list.json()).drops, []);
+    const challenge = await request("/api/drops/challenge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    assert.equal(challenge.status, 503);
   });
 
   await t.test("public feed is available and signed-wallet login is required to post", async () => {

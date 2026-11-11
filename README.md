@@ -7,12 +7,13 @@ A Render-ready Node app for the **Juicy Couture Coin** community project. It inc
 - Shows the project name, intended `$JCQ` ticker, Solana network, and configured mint address.
 - Displays live market figures from DexScreener after you add the real Solana mint address.
 - Offers a market-chart link only when market data returns a Solana pair.
-- Publishes the participation schedule: $2 CAD-value for verified breakfast attendance, up to $5 for helpful or positive participation, and up to $10 for community-building. The highest eligible tier per approved gathering applies; tiers do not stack.
+- Publishes the participation schedule: up to $2 CAD-value for verified breakfast attendance, up to $5 for helpful or positive participation, and up to $10 for community-building. The highest eligible tier per approved gathering or job applies; tiers do not stack.
 - Mints short-lived room access tokens on the server and uses LiveKit for browser video, audio, and in-room messages.
 - Connects compatible Solana Wallet Standard wallets, with Phantom and Solflare browser fallbacks, for viewers and streamers.
 - Supports wallet-approved tips to the shared streaming wallet and reviewed Jupiter swaps within the connected user's wallet.
 - Lets wallet-verified authors publish community images and delete their own posts.
-- Does not mint a token, hold wallet keys, or distribute participation rewards.
+- Automatically calculates token allocations for host-approved jobs and gatherings, with separate wallet-approved reward payouts.
+- Does not mint a token or hold wallet keys.
 
 The ticker is a project choice, not a unique on-chain identifier. Do not use `$JCQ` as a verified token until the token has been deployed and its full mint address has been published.
 
@@ -62,6 +63,8 @@ Do not source `.env.example` as a shell script; its display name contains spaces
 
 Open `http://localhost:3000`. Browser camera and microphone access requires HTTPS outside localhost. Join a room with a private room code and share its invite link only with people you want in the call. Room capacity defaults to 8 and can be set from 2 to 12 with `MAX_ROOM_PARTICIPANTS`.
 
+The live stage and tip panel lead the page beneath the crown header. Visitors without an invite use the shared `DEFAULT_LIVE_ROOM` channel (`juicy-live` by default); a `?room=...` invite selects its own room instead. **Watch live** joins as a viewer with no camera or microphone request, using an optional display name or Guest. **Go live** explicitly enables publishing. The live badge reflects an unmuted video publication, not merely someone joining the room. If the browser blocks playback, an enable-playback button appears. Leaving video keeps the connected wallet available for the feed, swaps, and reward drops.
+
 ## Send tokens during a stream
 
 Configure `TOKEN_MINT` with the full address of an existing **standard Solana SPL token mint** and `STREAM_WALLET_ADDRESS` with the public receiving wallet address. All rooms pay this one app wallet. Restart after changing either setting. This feature does not create a currency or a wallet. Token-2022 mints are not supported.
@@ -75,6 +78,18 @@ The wallet panel inside the app connects to the user's existing Solana wallet. I
 Private keys stay in the user's wallet. Wallets must support Solana transaction signing; posting images additionally requires message signing. Ethereum-only and other incompatible wallets cannot sign Solana transactions. This is a connected wallet interface; the app does not create custodial accounts, hold users' coins, or maintain internal coin credits. Failed balance lookups show an unavailable state rather than a zero balance. Token amounts are handled with exact base units and checked against available tokens before preparation. Frozen token accounts cannot send.
 
 Only the wallet signs. The server constructs a checked token transfer for the configured mint and recipient, rejects changes to the prepared transaction, and reports success only after confirmation. If confirmation is uncertain, check the displayed transaction signature before sending again. A confirmed tip does not represent a reward payment or an entry in an app balance. There is no fee deducted for the app.
+
+## Approved jobs and token drops
+
+Configure the public funding-wallet addresses in `REWARD_HOST_WALLETS` (comma-separated), the verified `TOKEN_MINT`, and a matching `SOLANA_CLUSTER`/RPC. These wallets are the only hosts allowed to create and approve drops. A connected authorized host sees the controls under **Rewards & drops**. The application never needs a host private key or seed phrase.
+
+1. Create a gathering or approved-job drop with a unique event code, title, and the **host-entered CAD value per token**. This is an explicit valuation snapshot, not an exchange-rate oracle or a promise of market value.
+2. Approve each recipient wallet and a reward tier, choosing a CAD amount up to that tier's cap. Approval automatically calculates and queues its token allocation using exact base units, rounding down rather than exceeding the approved CAD value. Approving a higher eligible tier replaces the previous allocation; amounts never stack for the same wallet and event code.
+3. Review the token drop: full recipients, amounts, mint, network, valuation, and funding wallet. Only **Approve payout in wallet** signs the actual on-chain transfer. Hosting a job, clicking approve, viewing a stream, or posting a photo never automatically spends tokens.
+
+Each drop supports up to five recipients in one atomic legacy SPL transaction. The host needs enough tokens and SOL for fees and any recipient-account creation. Only confirmed transactions mark rewards paid. Drop records and receipts persist in `drops.sqlite` on the same persistent volume as community posts. Pending or uncertain payments keep their signature and cannot be issued again, including after server restart. Use **Check payout status** to reconcile them. A prepared transaction that was never submitted can be reviewed again after its expiry and verified finalized block-height expiration; submitted or paid drops remain locked. Do not broadcast a prepared drop outside this application.
+
+Job completion and real-world attendance remain verified by hosts. Automation covers allocation math, queuing, and receipt reconciliation; each payout still requires the host's wallet transaction approval. A token mint, approved funding hosts, funded wallets, and working RPC access are prerequisites for real drops. Automated tests simulate chain responses and send no real tokens.
 
 Run `npm test` for payment validation and transaction tests. They use simulated chain and stream responses and never move funds. Real wallet, LiveKit, and RPC integration requires the settings above.
 
@@ -97,10 +112,10 @@ Only mainnet, exact-input swaps of standard SPL tokens with a verified direct ro
 ## Privacy and launch notes
 
 - Video and audio are not recorded by this app. Live media is handled by the configured LiveKit service; review its project settings and terms before inviting users.
-- Anyone with a room invite can attempt to join. Use a fresh, hard-to-guess room code for private gatherings; this starter does not include accounts, moderation tools, or room passwords.
+- The default community channel is public. Anyone with another room's invite can also attempt to join. Use a fresh, hard-to-guess room code for private gatherings; this starter does not include room passwords or video moderation tools.
 - LiveKit API secrets stay server-side. The browser receives a room-scoped token that expires after 15 minutes.
 - The app is not affiliated with, endorsed by, or sponsored by Juicy Couture or its owners.
-- Crypto assets can lose all value. Market displays and participation rewards are not an investment promise. Reward payouts remain manual and inactive until the project establishes and publishes a working distribution process.
+- Crypto assets can lose all value. Market displays and participation rewards are not an investment promise. Reward hosts must verify participation, publish their distribution policy, and approve each wallet-funded payout.
 
 ## Environment variables
 
@@ -115,9 +130,11 @@ Only mainnet, exact-input swaps of standard SPL tokens with a verified direct ro
 | `SOLANA_RPC_URL` | No | Server-only HTTPS RPC endpoint for the selected cluster. |
 | `JUPITER_API_KEY` | For swaps | Server-only API key for `api.jup.ag`; swaps require mainnet. |
 | `MEDIA_DATA_DIR` | For permanent posts | Persistent database/media folder; local default `.data/community`. |
+| `REWARD_HOST_WALLETS` | For reward drops | Comma-separated public funding-wallet addresses allowed to approve drops. |
 | `LIVEKIT_URL` | For video | LiveKit Cloud server URL. |
 | `LIVEKIT_API_KEY` | For video | LiveKit server-side API key. |
 | `LIVEKIT_API_SECRET` | For video | LiveKit server-side API secret. Keep secret. |
 | `MAX_ROOM_PARTICIPANTS` | No | Room limit from 2 to 12; defaults to 8. |
+| `DEFAULT_LIVE_ROOM` | No | Public community channel for visitors without an invite; defaults to `juicy-live`. |
 | `COMMUNITY_URL` | No | Optional HTTPS community invite link. |
 
