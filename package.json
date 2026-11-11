@@ -1,0 +1,16 @@
+{
+  "name": "juicy-couture-coin-live",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "esbuild client.js --bundle --minify --platform=browser --target=es2022 --outfile=public/app.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "esbuild": "0.25.10",
+    "livekit-client": "2.23.0",
+    "livekit-server-sdk": "2.19.3"
+  }
+}
