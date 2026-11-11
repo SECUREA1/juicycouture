@@ -21,3 +21,7 @@ await build({
 await Promise.all(["index.html", "styles.css", "crown.svg"].map((name) =>
   copyFile(new URL(name, import.meta.url), new URL(name, publicDirectory))
 ));
+await mkdir(new URL("graphics/", publicDirectory), { recursive: true });
+await Promise.all(["coin-medallion.jpeg", "juicy-banner.jpeg"].map((name) =>
+  copyFile(new URL(name, import.meta.url), new URL(`graphics/${name}`, publicDirectory))
+));

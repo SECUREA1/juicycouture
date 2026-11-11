@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@solana/spl-token": "0.4.14",

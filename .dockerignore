@@ -1,0 +1,11 @@
+.git
+node_modules
+public
+.env
+.env.*
+!.env.example
+npm-debug.log*
+test
+e2e
+test-results
+playwright-report

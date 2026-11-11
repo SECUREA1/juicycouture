@@ -70,6 +70,8 @@ Only the wallet signs. The server constructs a checked token transfer for the co
 
 Run `npm test` for payment validation and transaction tests. They use simulated chain and stream responses and never move funds. Real wallet, LiveKit, and RPC integration requires the settings above.
 
+The default test command targets `tests/` for this LiveKit application. The separate peer-to-peer fixtures under `test/` and `e2e/` expect a signaling implementation that is not wired into this server; they are retained from upstream and are not included in that command.
+
 ## Privacy and launch notes
 
 - Video and audio are not recorded by this app. Live media is handled by the configured LiveKit service; review its project settings and terms before inviting users.
