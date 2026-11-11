@@ -1,125 +1,43 @@
 <!doctype html>
-<html lang="en">
-<head>
+<html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#310817">
-  <meta name="description" content="Meet Juicy Couture Coin ($JCQ), an independent Solana community project celebrating the people who show up, lend a hand, and grow together. Discover the story, rewards, and live lounge.">
+  <meta name="description" content="Juicy Couture Coin community hub: Solana token dashboard, rewards and approved-job drops, live video, wallet tips, coin swaps, and community photos.">
   <title>Juicy Couture Coin ($JCQ) · Live Lounge</title>
   <link rel="icon" href="/crown.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
+  <script src="/app.js" defer=""></script>
 </head>
 <body>
-  <div class="announcement"><span>♛</span> JUICY COUTURE COIN <b class="announcement-context">·</b> <span class="announcement-context">SOLANA COMMUNITY HUB</span> <span>✦</span><button id="toggle-motion" type="button" aria-pressed="false">Pause motion</button></div>
+  <div class="announcement"><span>♛</span> JUICY COUTURE COIN <b>·</b> SOLANA COMMUNITY HUB <span>✦</span><button id="toggle-motion" type="button" aria-pressed="false">Pause motion</button></div>
   <header class="site-header">
-    <a class="brand" href="#home" aria-label="Juicy Couture Coin home"><span class="brand-mark"><img src="/crown.svg" alt="" width="36" height="36"></span><span>Juicy Couture<small>Community Coin</small></span></a>
-    <nav aria-label="Main navigation"><a href="#live-room">Watch &amp; tip</a><a href="#rewards">Rewards &amp; drops</a><a href="#community-feed">Community</a><a href="#story">The story</a></nav>
-    <a class="nav-button" href="#live-room">Watch &amp; tip <span aria-hidden="true">✦</span></a>
+    <a class="brand" href="#home" aria-label="Juicy Couture Coin home"><span class="brand-mark">JC</span><span>Juicy Couture<small>Community Coin</small></span></a>
+    <nav aria-label="Main navigation"><a href="#token">The coin</a><a href="#rewards">Rewards</a><a href="#community-feed">Community</a><a href="#live-room">Live lounge</a></nav>
+    <a class="nav-button" href="#live-room">Join the lounge <span aria-hidden="true">✦</span></a>
   </header>
 
   <main id="home">
-    <section class="hero shell crown-masthead" aria-label="Juicy Couture Coin community">
+    <section class="hero shell">
       <div class="hero-copy">
         <div class="eyebrow"><span>✦</span> A little sparkle. A lot of community.</div>
-        <h1>Dripping in <em>sweetness.</em> <br> Wrapped in luxury.</h1>
-        <p>Independent Solana community. Live conversations. A little sparkle for the people who show up.</p>
-        <div class="masthead-links"><a href="#live-room">Watch the lounge</a><span aria-hidden="true">·</span><a href="#rewards">Explore rewards</a></div>
-        <div class="hero-footnote">Project ticker: $JCQ · Network: Solana · See the official mint and launch status below.</div>
+        <h1>Collect the crown.<br><em>Bring the sparkle.</em></h1>
+        <p>Juicy Couture Coin is an independent Solana community meme coin with an official real-life participation rewards schedule and a live room to bring the crew together.</p>
+        <div class="hero-actions"><a class="button" href="#token">Meet your coin <span>✦</span></a><a class="button ghost" href="#rewards">Explore rewards</a></div>
+        <div class="hero-footnote">Support an active stream with a token tip approved in your Solana wallet.</div>
       </div>
-      <div class="hero-art"><div class="coin-aura"></div><img class="coin-image" src="/graphics/coin-medallion.jpeg" alt="Gold and ruby jeweled Juicy Couture Coin medallion"><div class="gem gem-one" aria-hidden="true">✧</div><div class="gem gem-two" aria-hidden="true">♡</div><div class="sparkle s1" aria-hidden="true">✦</div><div class="sparkle s2" aria-hidden="true">✧</div></div>
+      <div class="hero-art"><div class="coin-aura"></div><img class="coin-image" src="/graphics/coin-medallion.jpeg" alt="Jeweled Juicy Couture Coin medallion artwork"><div class="gem gem-one" aria-hidden="true">✧</div><div class="gem gem-two" aria-hidden="true">♡</div><div class="sparkle s1" aria-hidden="true">✦</div><div class="sparkle s2" aria-hidden="true">✧</div></div>
     </section>
-
-    <section class="lounge-section live-first" id="live-room" aria-labelledby="live-title">
-      <div class="shell lounge-layout">
-        <div class="lounge-intro"><div><div class="eyebrow">The Juicy Live Lounge</div><h2 id="live-title">Front-row energy. <br> <em>A little royal treatment.</em></h2></div><p>Watch the community channel or enter an invite code.</p></div>
-        <div class="lounge-card">
-          <div class="lounge-header"><div><div class="card-eyebrow">Community stage</div><h3 id="room-title">Your front-row seat</h3></div><span id="live-status-pill" class="live-status-pill" role="status">Room offline</span></div>
-          <div class="lounge-actions"><button id="join-room" class="button" type="button" disabled>Watch live</button><button id="go-live-button" class="button ghost" type="button" disabled>Go live</button><button id="copy-invite" class="small-button" type="button" disabled>Copy invite</button><button id="enable-audio" class="small-button" type="button" hidden>Enable stream audio</button></div>
-          <div class="stream-stage">
-            <div id="stream-placeholder" class="stream-placeholder"><img src="/crown.svg" alt="" width="72" height="72"><h3>Your front-row seat is waiting.</h3><p>Choose Watch live to join without turning on your camera.</p><span class="stage-wordmark">JUICY COUTURE COIN <span aria-hidden="true">✦</span> LIVE LOUNGE</span></div>
-            <div id="video-grid" class="video-grid" aria-live="polite"></div>
-          </div>
-          <details class="room-join-disclosure"><summary>Room &amp; display name</summary>
-          <div class="join-fields"><label>Display name (optional)<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="Your name in the lounge"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="juicy-live"></label></div>
-          <label class="join-media-option"><input id="join-with-media" type="checkbox"> Join with camera and microphone</label>
-          </details>
-
-          <p id="room-status" class="status pending" role="status">The live lounge is being prepared. Please check back soon.</p>
-          <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="false">Mic muted</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="false">Camera off</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
-          <details class="room-chat-disclosure"><summary>Room chat</summary><div class="chat-box"><div class="chat-heading">Room chat <span>Say hi ✨</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Write a friendly message…" aria-label="Message" disabled><button class="small-button send-button" type="submit" disabled>Send</button></form></div></details>
-          <p class="stream-privacy">Watch with your camera off. Your camera and microphone are used only when you choose to enable them. No recording is configured by this app.</p>
-        </div>
-        <section class="tip-box" id="wallet" aria-labelledby="tip-heading">
-            <div class="tip-heading"><div><div class="card-eyebrow">Support the stream</div><h4 id="tip-heading">Tip the crown.</h4></div><span aria-hidden="true">✦</span></div>
-            <p id="tip-stream-state" class="tip-note">Join a live room to send tokens.</p>
-            <div class="tip-wallet-row"><label for="tip-wallet">Your Solana wallet<select id="tip-wallet"><option value="phantom">Phantom</option><option value="solflare">Solflare</option></select></label><button id="tip-connect" class="small-button" type="button">Connect wallet</button><button id="tip-disconnect" class="small-button" type="button" disabled>Disconnect</button></div>
-            <p id="tip-account" class="tip-account">No wallet connected</p>
-
-            <form id="tip-form">
-              <details class="tip-token-disclosure"><summary>Token &amp; network</summary><dl class="tip-details"><div><dt>Network</dt><dd id="tip-cluster">Not configured</dd></div><div><dt>Token mint · verify the full address</dt><dd><code id="tip-mint">Mint pending</code></dd></div></dl></details><dl class="tip-details tip-destination"><div><dt>Shared streaming wallet · receives your transfer</dt><dd><code id="tip-recipient">Not configured</code></dd></div></dl>
-              <label class="tip-amount-label" for="tip-amount">Amount in tokens<input id="tip-amount" type="text" inputmode="decimal" maxlength="40" autocomplete="off" placeholder="0.00" aria-describedby="tip-fee-note"></label>
-              <p id="tip-amount-status" class="status error" role="status"></p>
-              <p class="tip-review">You will send <strong><output id="tip-review-amount" for="tip-amount">0</output> tokens</strong> to the wallet shown above.</p>
-              <p id="tip-fee-note" class="tip-note">Keep SOL for network fees and any receiving token-account creation cost. Review and approve the tip in your wallet.</p>
-              <button id="tip-send" class="button" type="submit" disabled>Send tokens <span aria-hidden="true">♡</span></button>
-            </form>
-            <p id="tip-status" class="status pending" role="status" aria-live="polite">Connect your wallet, choose an amount, and approve your tip.</p>
-            <details class="wallet-balance-disclosure"><summary>Balances &amp; receiving address</summary>
-            <div class="wallet-overview" aria-label="Your wallet balance">
-              <dl class="wallet-balances"><div><dt>Your coin balance</dt><dd id="wallet-token-balance">—</dd></div><div><dt>Network fee balance</dt><dd id="wallet-sol-balance">—</dd></div></dl>
-              <div class="wallet-tools"><button id="wallet-refresh" class="small-button" type="button" disabled>Refresh balance</button><button id="wallet-copy-address" class="small-button" type="button" disabled>Copy my wallet address</button></div>
-              <p id="wallet-balance-status" class="tip-note" role="status">Connect your Solana wallet to see your balance.</p>
-              <p class="tip-note">Your coins stay in your connected wallet. Receive the token shown below and SOL at your address above, using the selected network. Then send coins to the streaming wallet below. Keep some SOL for fees.</p>
-            </div>
-            </details>
-            <p id="tip-receipt" class="tip-receipt" hidden>Transaction: <a id="tip-receipt-link" target="_blank" rel="noopener noreferrer"></a></p>
-            <button id="tip-checked" class="small-button" type="button" hidden>I checked this transaction · allow another tip</button>
-            <details class="wallet-swap-disclosure"><summary>Swap coins in your wallet</summary>
-            <section class="swap-box" aria-labelledby="swap-heading">
-              <div class="card-eyebrow">Exchange in your wallet</div><h4 id="swap-heading">A fresh kind of sparkle.</h4>
-              <p class="tip-note">Swap SOL and supported Solana tokens into your connected wallet. Viewers and streamers use the same tools.</p>
-              <form id="swap-form">
-                <div class="swap-token-fields"><label for="swap-input-mint">Pay with<select id="swap-input-mint"></select></label><label for="swap-output-mint">Receive<select id="swap-output-mint"></select></label></div>
-                <label id="swap-input-custom-field" class="tip-amount-label" for="swap-input-custom" hidden>Input token mint<input id="swap-input-custom" type="text" autocomplete="off" spellcheck="false" placeholder="Full Solana SPL token mint"></label>
-                <label id="swap-output-custom-field" class="tip-amount-label" for="swap-output-custom" hidden>Output token mint<input id="swap-output-custom" type="text" autocomplete="off" spellcheck="false" placeholder="Full Solana SPL token mint"></label>
-                <label class="tip-amount-label" for="swap-amount">Amount to exchange<input id="swap-amount" type="text" inputmode="decimal" maxlength="40" placeholder="0.00" autocomplete="off"></label>
-                <label class="swap-slippage" for="swap-slippage">Slippage tolerance<select id="swap-slippage"><option value="50">0.5%</option><option value="100">1%</option></select></label>
-                <button id="swap-quote" class="small-button" type="submit" disabled>Get a quote</button>
-              </form>
-              <div id="swap-review" class="swap-review" hidden><h5>Review your swap</h5><dl><div><dt>Your wallet</dt><dd id="swap-wallet-address"></dd></div><div><dt>Network</dt><dd>Solana mainnet · real tokens</dd></div><div><dt>You pay</dt><dd id="swap-review-input"></dd></div><div><dt>Estimated receive</dt><dd id="swap-review-output"></dd></div><div><dt>Minimum receive</dt><dd id="swap-review-minimum"></dd></div><div><dt>Price impact</dt><dd id="swap-review-impact"></dd></div><div><dt>Slippage</dt><dd id="swap-review-slippage"></dd></div><div><dt>Quote expires</dt><dd id="swap-review-expiry"></dd></div></dl><p class="tip-note">Solana fees and token-account creation costs are paid in SOL. The quote includes the route's trading fees. Review the full transaction in your wallet.</p><button id="swap-confirm" class="button" type="button" disabled>Approve swap in wallet</button></div>
-              <p id="swap-status" class="status" role="status" aria-live="polite">Loading swap availability…</p>
-              <p id="swap-receipt" class="tip-receipt" hidden>Transaction: <a id="swap-receipt-link" target="_blank" rel="noopener noreferrer"></a></p>
-              <button id="swap-checked" class="small-button" type="button" hidden>I checked this transaction · allow another swap</button>
-            </section>
-            </details>
-          </section>
-      </div>
-    </section>
-
 
     <div class="sparkle-ribbon" aria-label="Community, live lounges, and a little sparkle"><div class="ribbon-track" aria-hidden="true"><span>✦ COMMUNITY FIRST &nbsp; ♛ BRING THE SPARKLE &nbsp; ♡ LIVE TOGETHER &nbsp; ✦ SOLANA COMMUNITY &nbsp; </span><span>✦ COMMUNITY FIRST &nbsp; ♛ BRING THE SPARKLE &nbsp; ♡ LIVE TOGETHER &nbsp; ✦ SOLANA COMMUNITY &nbsp; </span></div></div>
-    <section class="story-section" id="story" aria-labelledby="story-title">
-      <div class="shell">
-        <div class="section-title"><div class="eyebrow">The story</div><h2 id="story-title">For the ones who<br><em>bring the sparkle.</em></h2><p>A playful corner of crypto culture where the look is luxe, the mood is joyful, and the community writes the next chapter.</p></div>
-        <div class="story-layout">
-          <figure class="story-art"><img src="/graphics/juicy-banner.jpeg" alt="Juicy Couture Coin banner with a sparkling coin, crown, and ruby-pink velvet" loading="lazy"></figure>
-          <div class="story-copy">
-            <h3>More than a pretty face.</h3>
-            <p>Juicy Couture Coin ($JCQ) brings a collectible visual world and an official schedule for recognizing real-life participation together. From showing up for breakfast to helping a new face feel welcome, the little moments are part of the story.</p>
-            <ul class="story-values"><li><span aria-hidden="true">♛</span> A recognizable, collectible visual world</li><li><span aria-hidden="true">♡</span> Community-led conversation and culture</li><li><span aria-hidden="true">✧</span> Official real-life participation rewards</li></ul>
-            <p class="story-note">An independent project, not affiliated with, endorsed by, or sponsored by Juicy Couture or its owners. The verified mint, token setup, and distribution details will be published before participation rewards begin.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <section class="brand-banner shell" aria-label="Juicy Couture Coin community artwork"><img src="/graphics/juicy-banner.jpeg" alt="Juicy Couture Coin banner: dripping in sweetness, wrapped in luxury, powered by community"></section>
 
     <section class="token-section" id="token">
       <div class="shell">
         <div class="section-title row-title"><div><div class="eyebrow">The coin · Solana</div><h2>One pretty little token.<br><em>A whole community behind it.</em></h2></div><div id="launch-status" class="launch-pill">Checking launch status…</div></div>
         <div class="token-grid">
           <article class="token-card identity-card"><div class="card-eyebrow">Official project details</div><h3 id="coin-name">Juicy Couture Coin</h3><div class="symbol-line"><span id="coin-symbol">$JCQ</span><span class="chain-pill" id="network">Solana</span></div><div class="mint-label">Official mint address</div><code id="mint-address">Pending official mint</code><p>Always verify the complete mint address before interacting with any token. Ticker symbols can be reused.</p></article>
-          <article class="token-card market-card"><div class="market-top"><div><div class="card-eyebrow">Live market snapshot</div><h3>Solana market</h3></div><span class="live-dot" aria-hidden="true"></span></div><div class="market-metrics"><div class="metric"><small>Price</small><strong id="price">—</strong></div><div class="metric"><small>FDV</small><strong id="fdv">—</strong></div><div class="metric"><small>Liquidity</small><strong id="liquidity">—</strong></div><div class="metric"><small>24h volume</small><strong id="volume">—</strong></div><div class="metric"><small>24h change</small><strong id="change" class="metric-value">—</strong></div></div><div id="market-status" class="market-note">Waiting for the verified mint address.</div><a id="market-link" class="market-link" href="#" target="_blank" rel="noopener noreferrer" hidden>View market chart</a></article>
+          <article class="token-card market-card"><div class="market-top"><div><div class="card-eyebrow">Live market snapshot</div><h3>Solana market</h3></div><span class="live-dot" aria-hidden="true"></span></div><div class="market-metrics"><div class="metric"><small>Price</small><strong id="price">—</strong></div><div class="metric"><small>FDV</small><strong id="fdv">—</strong></div><div class="metric"><small>Liquidity</small><strong id="liquidity">—</strong></div><div class="metric"><small>24h volume</small><strong id="volume">—</strong></div><div class="metric"><small>24h change</small><strong id="change" class="metric-value">—</strong></div></div><div id="market-status" class="market-note">Waiting for the verified mint address.</div><a id="market-link" class="market-link" href="#" target="_blank" rel="noopener noreferrer" hidden="">View market chart ↗</a></article>
         </div>
         <div class="source-note">Market figures are third-party estimates and can be delayed or incomplete. The project does not promise a price, return, or liquidity level.</div>
       </div>
@@ -138,24 +56,68 @@
           <div class="drops-heading"><div><div class="eyebrow">Community token drops</div><h3 id="drops-title">Good moments. Real recognition.</h3></div><p>Each drop is reviewed by a host. Only confirmed wallet payouts count as paid rewards.</p></div>
           <p id="drop-status" class="status" role="status">Checking upcoming token drops…</p>
           <div id="drop-list" class="drop-list"></div>
-          <section id="drop-host-panel" class="drop-host-panel" hidden aria-labelledby="drop-host-title">
+          <section id="drop-host-panel" class="drop-host-panel" hidden="" aria-labelledby="drop-host-title">
             <h3 id="drop-host-title">Host a token drop</h3>
             <p class="drop-note">Host-entered CAD value per coin; reviewed before payout. Up to five approved recipients per drop. Approved jobs receive a calculated token allocation automatically. Hosts review and sign actual payouts. A wallet signature approves each management action; payouts require a separate transaction approval.</p>
             <div class="drop-host-grid">
-              <form id="drop-create-form"><h4>1. Set up a reward</h4><label for="drop-kind">Reward for<select id="drop-kind"><option value="gathering">Community gathering</option><option value="job">Approved job</option></select></label><label for="drop-event-code">Job or gathering code<input id="drop-event-code" maxlength="40" autocomplete="off" placeholder="juicy-breakfast-november" required></label><label for="drop-title">Drop title<input id="drop-title" maxlength="100" placeholder="Community breakfast" required></label><label for="drop-cad-price">CAD value per coin<input id="drop-cad-price" inputmode="decimal" autocomplete="off" placeholder="0.00" required></label><button id="drop-create" class="button" type="submit">Create token drop</button></form>
-              <form id="drop-approve-form"><h4>2. Review a recipient</h4><label for="drop-select">Job or gathering<select id="drop-select" required></select></label><label for="drop-recipient">Recipient Solana wallet<input id="drop-recipient" autocomplete="off" spellcheck="false" placeholder="Full public wallet address" required></label><div class="drop-amount-fields"><label for="drop-tier">Reward tier<select id="drop-tier"><option value="breakfast">Breakfast · up to $2 CAD</option><option value="helping">Helping hands · up to $5 CAD</option><option value="builder">Community builder · up to $10 CAD</option></select></label><label for="drop-cad-amount">CAD reward value<input id="drop-cad-amount" inputmode="decimal" autocomplete="off" placeholder="0.00" required></label></div><button id="drop-approve" class="button" type="submit">Approve &amp; queue reward</button></form>
+              <form id="drop-create-form"><h4>1. Set up a reward</h4><label for="drop-kind">Reward for<select id="drop-kind"><option value="gathering">Community gathering</option><option value="job">Approved job</option></select></label><label for="drop-event-code">Job or gathering code<input id="drop-event-code" maxlength="40" autocomplete="off" placeholder="juicy-breakfast-november" required=""></label><label for="drop-title">Drop title<input id="drop-title" maxlength="100" placeholder="Community breakfast" required=""></label><label for="drop-cad-price">CAD value per coin<input id="drop-cad-price" inputmode="decimal" autocomplete="off" placeholder="0.00" required=""></label><button id="drop-create" class="button" type="submit">Create token drop</button></form>
+              <form id="drop-approve-form"><h4>2. Review a recipient</h4><label for="drop-select">Job or gathering<select id="drop-select" required=""></select></label><label for="drop-recipient">Recipient Solana wallet<input id="drop-recipient" autocomplete="off" spellcheck="false" placeholder="Full public wallet address" required=""></label><div class="drop-amount-fields"><label for="drop-tier">Reward tier<select id="drop-tier"><option value="breakfast">Breakfast · up to $2 CAD</option><option value="helping">Helping hands · up to $5 CAD</option><option value="builder">Community builder · up to $10 CAD</option></select></label><label for="drop-cad-amount">CAD reward value<input id="drop-cad-amount" inputmode="decimal" autocomplete="off" placeholder="0.00" required=""></label></div><button id="drop-approve" class="button" type="submit">Approve &amp; queue reward</button></form>
             </div>
-            <div class="drop-payout-controls"><h4>3. Review and fund the drop</h4><div id="drop-payout-review"></div><div class="lounge-actions"><button id="drop-prepare" class="small-button" type="button">Review token drop</button><button id="drop-send" class="button" type="button" disabled>Approve payout in wallet</button></div><p id="drop-host-status" class="status" role="status"></p><p id="drop-receipt" class="tip-receipt" hidden>Transaction: <a id="drop-receipt-link" target="_blank" rel="noopener noreferrer"></a></p></div>
+            <div class="drop-payout-controls"><h4>3. Review and fund the drop</h4><div id="drop-payout-review"></div><div class="lounge-actions"><button id="drop-prepare" class="small-button" type="button">Review token drop</button><button id="drop-send" class="button" type="button" disabled="">Approve payout in wallet</button></div><p id="drop-host-status" class="status" role="status"></p><p id="drop-receipt" class="tip-receipt" hidden="">Transaction: <a id="drop-receipt-link" target="_blank" rel="noopener noreferrer"></a></p></div>
           </section>
         </div>
 
       </div>
     </section>
 
-    <section class="invitation-section" aria-labelledby="invitation-title">
-      <div class="shell invitation-inner">
-        <div><div class="eyebrow">Your invitation to the Juicy era</div><h2 id="invitation-title">A little coin.<br><em>A whole main-character moment.</em></h2><p>Collect the sparkling medallion, find your reward vibe, and help turn everyday get-togethers into the best part of the story.</p><div class="hero-actions"><a class="button" href="#live-room">Find your people <span aria-hidden="true">♡</span></a><a class="button ghost" href="#rewards">Find your reward vibe</a></div></div>
-        <div class="invitation-mark" aria-hidden="true">♛</div>
+    <section class="lounge-section" id="live-room" aria-labelledby="live-title">
+      <div class="shell lounge-layout">
+        <div class="lounge-intro"><div class="eyebrow">The Juicy Live Lounge</div><h2 id="live-title">Bring your voice.<br><em>Bring your people.</em></h2><p>Watch the community channel, catch up with your people, or enter a room code from a private invite. Connect your wallet to support the stream.</p><div class="lounge-promises"><span>✦ Small-group video</span><span>✦ Built-in chat</span><span>✦ No recording by this app</span></div><div class="privacy-note">Watch live with your camera off. Your camera and microphone turn on only when you choose Go live or enable them. Video is handled by LiveKit; no recording is configured by this app.</div></div>
+        <div class="lounge-card"><div class="lounge-header"><div><div class="card-eyebrow">Community stage</div><h3 id="room-title">Your front-row seat</h3></div><span id="live-status-pill" class="live-status-pill" role="status">Room offline</span></div><div class="join-fields"><label>Display name (optional)<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="Your name in the lounge"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="juicy-live"></label></div><label class="join-media-option"><input id="join-with-media" type="checkbox"> Join with camera and microphone</label><div class="lounge-actions"><button id="join-room" class="button" type="button" disabled="">Watch live</button><button id="go-live-button" class="button ghost" type="button" disabled="">Go live</button><button id="copy-invite" class="small-button" type="button" disabled="">Copy invite</button><button id="enable-audio" class="small-button" type="button" hidden="">Enable stream audio</button></div><p id="room-status" class="status pending" role="status">The live lounge is being prepared. Please check back soon.</p><div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled="" aria-pressed="false">Mic muted</button><button id="toggle-camera" class="small-button" type="button" disabled="" aria-pressed="false">Camera off</button><button id="leave-room" class="small-button leave" type="button" disabled="">Leave</button></div></div><div class="stream-stage">
+            <div id="stream-placeholder" class="stream-placeholder"><img src="/crown.svg" alt="" width="72" height="72"><h3>Your front-row seat is waiting.</h3><p>Choose Watch live to join without turning on your camera.</p><span class="stage-wordmark">JUICY COUTURE COIN <span aria-hidden="true">✦</span> LIVE LOUNGE</span></div>
+            <div id="video-grid" class="video-grid" aria-live="polite"></div>
+          </div><section class="tip-box" id="wallet" aria-labelledby="tip-heading">
+            <div class="tip-heading"><div><div class="card-eyebrow">Your in-app wallet</div><h4 id="tip-heading">Send a little sparkle</h4></div><span aria-hidden="true">✦</span></div>
+            <p id="tip-stream-state" class="tip-note">Join a live room to send tokens.</p>
+            <div class="tip-wallet-row"><label for="tip-wallet">Your Solana wallet<select id="tip-wallet"><option value="phantom">Phantom</option><option value="solflare">Solflare</option></select></label><button id="tip-connect" class="small-button" type="button">Connect wallet</button><button id="tip-disconnect" class="small-button" type="button" disabled="">Disconnect</button></div>
+            <p id="tip-account" class="tip-account">No wallet connected</p><div class="wallet-overview" aria-label="Your wallet balance">
+              <dl class="wallet-balances"><div><dt>Your coin balance</dt><dd id="wallet-token-balance">—</dd></div><div><dt>Network fee balance</dt><dd id="wallet-sol-balance">—</dd></div></dl>
+              <div class="wallet-tools"><button id="wallet-refresh" class="small-button" type="button" disabled="">Refresh balance</button><button id="wallet-copy-address" class="small-button" type="button" disabled="">Copy my wallet address</button></div>
+              <p id="wallet-balance-status" class="tip-note" role="status">Connect your Solana wallet to see your balance.</p>
+              <p class="tip-note">Your coins stay in your connected wallet. Receive the token shown below and SOL at your address above, using the selected network. Then send coins to the streaming wallet below. Keep some SOL for fees.</p>
+            </div>
+
+            <form id="tip-form">
+              <dl class="tip-details"><div><dt>Network</dt><dd id="tip-cluster">Not configured</dd></div><div><dt>Token mint · verify the full address</dt><dd><code id="tip-mint">Mint pending</code></dd></div></dl><dl class="tip-details tip-destination"><div><dt>Shared streaming wallet · receives your transfer</dt><dd><code id="tip-recipient">Not configured</code></dd></div></dl>
+              <label class="tip-amount-label" for="tip-amount">Amount in tokens<input id="tip-amount" type="text" inputmode="decimal" maxlength="40" autocomplete="off" placeholder="0.00" aria-describedby="tip-fee-note"></label>
+              <p id="tip-amount-status" class="status error" role="status"></p>
+              <p class="tip-review">You will send <strong><output id="tip-review-amount" for="tip-amount">0</output> tokens</strong> to the wallet shown above.</p>
+              <p id="tip-fee-note" class="tip-note">Keep SOL for network fees and any receiving token-account creation cost. Review and approve the tip in your wallet.</p>
+              <button id="tip-send" class="button" type="submit" disabled="">Send tokens <span aria-hidden="true">♡</span></button>
+            </form>
+            <p id="tip-status" class="status pending" role="status" aria-live="polite">Connect your wallet, choose an amount, and approve your tip.</p>
+
+            <p id="tip-receipt" class="tip-receipt" hidden="">Transaction: <a id="tip-receipt-link" target="_blank" rel="noopener noreferrer"></a></p>
+            <button id="tip-checked" class="small-button" type="button" hidden="">I checked this transaction · allow another tip</button>
+            <details class="wallet-swap-disclosure"><summary>Swap coins in your wallet</summary>
+            <section class="swap-box" aria-labelledby="swap-heading">
+              <div class="card-eyebrow">Exchange in your wallet</div><h4 id="swap-heading">A fresh kind of sparkle.</h4>
+              <p class="tip-note">Swap SOL and supported Solana tokens into your connected wallet. Viewers and streamers use the same tools.</p>
+              <form id="swap-form">
+                <div class="swap-token-fields"><label for="swap-input-mint">Pay with<select id="swap-input-mint"></select></label><label for="swap-output-mint">Receive<select id="swap-output-mint"></select></label></div>
+                <label id="swap-input-custom-field" class="tip-amount-label" for="swap-input-custom" hidden="">Input token mint<input id="swap-input-custom" type="text" autocomplete="off" spellcheck="false" placeholder="Full Solana SPL token mint"></label>
+                <label id="swap-output-custom-field" class="tip-amount-label" for="swap-output-custom" hidden="">Output token mint<input id="swap-output-custom" type="text" autocomplete="off" spellcheck="false" placeholder="Full Solana SPL token mint"></label>
+                <label class="tip-amount-label" for="swap-amount">Amount to exchange<input id="swap-amount" type="text" inputmode="decimal" maxlength="40" placeholder="0.00" autocomplete="off"></label>
+                <label class="swap-slippage" for="swap-slippage">Slippage tolerance<select id="swap-slippage"><option value="50">0.5%</option><option value="100">1%</option></select></label>
+                <button id="swap-quote" class="small-button" type="submit" disabled="">Get a quote</button>
+              </form>
+              <div id="swap-review" class="swap-review" hidden=""><h5>Review your swap</h5><dl><div><dt>Your wallet</dt><dd id="swap-wallet-address"></dd></div><div><dt>Network</dt><dd>Solana mainnet · real tokens</dd></div><div><dt>You pay</dt><dd id="swap-review-input"></dd></div><div><dt>Estimated receive</dt><dd id="swap-review-output"></dd></div><div><dt>Minimum receive</dt><dd id="swap-review-minimum"></dd></div><div><dt>Price impact</dt><dd id="swap-review-impact"></dd></div><div><dt>Slippage</dt><dd id="swap-review-slippage"></dd></div><div><dt>Quote expires</dt><dd id="swap-review-expiry"></dd></div></dl><p class="tip-note">Solana fees and token-account creation costs are paid in SOL. The quote includes the route's trading fees. Review the full transaction in your wallet.</p><button id="swap-confirm" class="button" type="button" disabled="">Approve swap in wallet</button></div>
+              <p id="swap-status" class="status" role="status" aria-live="polite">Loading swap availability…</p>
+              <p id="swap-receipt" class="tip-receipt" hidden="">Transaction: <a id="swap-receipt-link" target="_blank" rel="noopener noreferrer"></a></p>
+              <button id="swap-checked" class="small-button" type="button" hidden="">I checked this transaction · allow another swap</button>
+            </section>
+            </details>
+          </section><div class="chat-box"><div class="chat-heading">Room chat <span>Say hi ✨</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Write a friendly message…" aria-label="Message" disabled=""><button class="small-button send-button" type="submit" disabled="">Send</button></form></div></div>
       </div>
     </section>
 
@@ -163,18 +125,17 @@
       <div class="shell">
         <div class="section-title"><div class="eyebrow">The community album</div><h2 id="community-title">Your moments.<br><em>Our kind of sparkle.</em></h2><p>Share a photo from your corner of the community. Posts are public and stay in the feed until their author removes them.</p></div>
         <form id="feed-form" class="feed-composer">
-          <div><label for="feed-image">Choose a photo</label><input id="feed-image" type="file" accept="image/jpeg,image/png,image/webp" required><small>JPEG, PNG, or WebP · up to 5 MB</small></div>
+          <div><label for="feed-image">Choose a photo</label><input id="feed-image" type="file" accept="image/jpeg,image/png,image/webp" required=""><small>JPEG, PNG, or WebP · up to 5 MB</small></div>
           <div><label for="feed-caption">Add a caption</label><textarea id="feed-caption" maxlength="500" rows="3" placeholder="A little moment worth sharing…"></textarea></div>
           <div class="feed-publish"><p id="feed-auth-status">Connect your Solana wallet above to post. A message signature confirms your authorship; it does not transfer coins.</p><button id="feed-submit" class="button" type="submit">Post image <span aria-hidden="true">✧</span></button><a href="#wallet" class="feed-wallet-link">Go to my wallet</a></div>
         </form>
         <p id="feed-status" class="status" role="status" aria-live="polite">Loading community posts…</p>
         <div id="feed-posts" class="feed-grid"></div>
-        <button id="feed-load-more" class="small-button" type="button" hidden>Load more moments</button>
+        <button id="feed-load-more" class="small-button" type="button" hidden="">Load more moments</button>
       </div>
-    </section>
-
-    <section class="launch-section"><div class="shell launch-inner"><div><div class="eyebrow">An independent community project</div><h2>Keep it juicy.<br><em>Keep it kind.</em></h2><p>Not affiliated with, endorsed by, or sponsored by Juicy Couture or its owners. Crypto assets are volatile and may lose all value. The reward schedule does not promise token-price growth.</p></div><a id="community-link" class="button ghost" href="#" target="_blank" rel="noopener noreferrer" hidden>Join the community</a></div></section>
+    </section><section class="launch-section"><div class="shell launch-inner"><div><div class="eyebrow">An independent community project</div><h2>Keep it juicy.<br><em>Keep it kind.</em></h2><p>Not affiliated with, endorsed by, or sponsored by Juicy Couture or its owners. Crypto assets are volatile and may lose all value. The reward schedule does not promise token-price growth.</p></div><a id="community-link" class="button ghost" href="#" target="_blank" rel="noopener noreferrer" hidden="">Join the community</a></div></section>
   </main>
   <footer><div class="shell footer-line"><span>Juicy Couture Coin ♛</span><span>Independent Solana community meme coin · Mint pending</span><span>© 2026 · Keep it kind</span></div></footer>
-</body>
-</html>
+
+
+</body></html>
