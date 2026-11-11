@@ -1,3 +1,5 @@
+import { Room, RoomEvent, Track } from "livekit-client";
+
 const $ = (selector) => document.querySelector(selector);
 const els = {
   coinName: $("#coin-name"), symbol: $("#coin-symbol"), network: $("#network"), mint: $("#mint-address"),
@@ -61,7 +63,10 @@ async function loadConfig() {
       }
     } catch {}
   }
-  els.join.disabled = false;
+  if (!config.videoReady) {
+    els.join.disabled = true;
+    setStatus(els.roomStatus, "Video setup needed: add your LiveKit Cloud URL and API credentials in Render.", "pending");
+  }
   await loadMarket();
 }
 
@@ -105,18 +110,17 @@ function addChatLine(name, message, mine = false) {
   body.textContent = message;
   row.append(sender, body);
   els.chatMessages.append(row);
-  if (els.chatMessages.children.length > 100) els.chatMessages.firstElementChild.remove();
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
 }
 
 function updateParticipants() {
   if (!room) return;
-  const total = room.peers.size + 1;
+  const total = room.remoteParticipants.size + 1;
   els.participants.textContent = `${total} ${total === 1 ? "person" : "people"} here`;
 }
 
-function addVideoTile(identity, label, stream, local = false) {
-  let tile = els.videos.querySelector(`[data-identity="${CSS.escape(identity)}"]`);
+function addVideoTile(identity, label, track, local = false) {
+  let tile = document.querySelector(`[data-identity="${CSS.escape(identity)}"]`);
   if (!tile) {
     tile = document.createElement("article");
     tile.className = `video-tile${local ? " self" : ""}`;
@@ -134,326 +138,69 @@ function addVideoTile(identity, label, stream, local = false) {
   video.setAttribute("aria-label", `${label} camera`);
   tile.querySelector("video")?.remove();
   tile.prepend(video);
-  video.srcObject = stream;
-  video.play().catch(() => { video.controls = true; });
+  track.attach(video);
 }
 
 function removeTile(identity) {
-  els.videos.querySelector(`[data-identity="${CSS.escape(identity)}"]`)?.remove();
-}
-
-function sendRoom(session, message) {
-  if (session.socket?.readyState !== WebSocket.OPEN) return false;
-  session.socket.send(JSON.stringify(message));
-  return true;
-}
-
-function updateMedia(peer) {
-  const tile = els.videos.querySelector(`[data-identity="${CSS.escape(peer.id)}"]`);
-  if (!tile) return;
-  tile.querySelector("video").hidden = !peer.camera;
-  tile.querySelector(".video-name").textContent = `${peer.name}${peer.id === room?.id ? " · you" : ""}${peer.camera ? "" : " · camera off"}${peer.microphone ? "" : " · muted"}`;
-}
-
-function requestRelay(session, peer) {
-  if (!session.closed && !peer.relay) sendRoom(session, { type: "relay-request", to: peer.id });
-}
-
-function sendMedia(session, kind, bytes) {
-  if (session.closed || session.socket?.readyState !== WebSocket.OPEN) return;
-  const headerSize = kind === 2 ? 41 : 37;
-  for (const peer of session.peers.values()) {
-    if (!peer.relay || session.socket.bufferedAmount > 256 * 1024) continue;
-    const packet = new Uint8Array(headerSize + bytes.byteLength);
-    packet[0] = kind;
-    packet.set(new TextEncoder().encode(peer.id), 1);
-    if (kind === 2) new DataView(packet.buffer).setUint32(37, session.audioContext.sampleRate, true);
-    packet.set(new Uint8Array(bytes), headerSize);
-    session.socket.send(packet);
-  }
-}
-
-async function startRelayCapture(session) {
-  if (session.captureStarted) return;
-  session.captureStarted = true;
-  const video = session.captureVideo = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.srcObject = session.stream;
-  await video.play();
-  if (session.closed) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = 480;
-  canvas.height = 270;
-  const context = canvas.getContext("2d");
-  let drawing = false;
-  session.videoTimer = setInterval(async () => {
-    if (session.closed || !cameraOn || drawing || !video.videoWidth || session.socket.bufferedAmount > 256 * 1024) return;
-    drawing = true;
-    try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.55));
-      if (blob && blob.size < 60_000) sendMedia(session, 1, await blob.arrayBuffer());
-    } finally { drawing = false; }
-  }, 125);
-  await session.audioContext.audioWorklet.addModule("/audio-worklet.js");
-  if (session.closed) return;
-  session.audioSource = session.audioContext.createMediaStreamSource(session.stream);
-  session.captureNode = new AudioWorkletNode(session.audioContext, "room-audio-capture");
-  session.captureNode.port.onmessage = ({ data }) => { if (micOn) sendMedia(session, 2, data); };
-  session.audioSource.connect(session.captureNode).connect(session.audioContext.destination);
-}
-
-function enableRelay(session, id) {
-  const peer = session.peers.get(id);
-  if (!peer || peer.relay || session.closed) return;
-  peer.relay = true;
-  stopPeerConnection(peer);
-  peer.canvas = document.createElement("canvas");
-  peer.canvas.width = 480;
-  peer.canvas.height = 270;
-  peer.audioSink = session.audioContext.createMediaStreamDestination();
-  peer.relayStream = peer.canvas.captureStream(10);
-  peer.relayStream.addTrack(peer.audioSink.stream.getAudioTracks()[0]);
-  addVideoTile(peer.id, peer.name, peer.relayStream);
-  updateMedia(peer);
-  startRelayCapture(session).catch(() => {
-    if (!session.closed) setStatus(els.roomStatus, "Could not start the room media. Try leaving and rejoining.", "error");
-  });
-}
-
-async function receiveMedia(session, packet) {
-  if (session.closed || packet.byteLength < 38) return;
-  const bytes = new Uint8Array(packet);
-  const id = new TextDecoder().decode(bytes.subarray(1, 37));
-  const peer = session.peers.get(id);
-  if (!peer?.relay) return;
-  if (bytes[0] === 1 && !peer.drawing) {
-    peer.drawing = true;
-    try {
-      const frame = await createImageBitmap(new Blob([bytes.subarray(37)], { type: "image/jpeg" }));
-      if (!session.closed && session.peers.has(id)) peer.canvas.getContext("2d").drawImage(frame, 0, 0, 480, 270);
-      frame.close();
-    } finally { peer.drawing = false; }
-  } else if (bytes[0] === 2 && packet.byteLength >= 43) {
-    const samples = new Int16Array(packet.slice(41));
-    const sampleRate = new DataView(packet).getUint32(37, true);
-    const buffer = session.audioContext.createBuffer(1, samples.length, sampleRate);
-    const channel = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
-    const source = session.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(peer.audioSink);
-    const now = session.audioContext.currentTime;
-    if (!peer.playAt || peer.playAt < now || peer.playAt > now + 0.5) peer.playAt = now + 0.12;
-    source.start(peer.playAt);
-    peer.playAt += buffer.duration;
-    source.onended = () => source.disconnect();
-  }
-}
-
-function addPeer(session, participant) {
-  if (session.peers.has(participant.id)) return session.peers.get(participant.id);
-  const pc = new RTCPeerConnection({ iceServers: config.iceServers });
-  const peer = { ...participant, pc, stream: new MediaStream(), candidates: [],
-    makingOffer: false, ignoreOffer: false, settingAnswer: false, retries: 0 };
-  session.peers.set(peer.id, peer);
-  for (const track of session.stream.getTracks()) pc.addTrack(track, session.stream);
-  pc.ontrack = ({ track }) => {
-    peer.stream.addTrack(track);
-    if (!els.videos.querySelector(`[data-identity="${CSS.escape(peer.id)}"]`)) {
-      addVideoTile(peer.id, peer.name, peer.stream);
-    }
-    updateMedia(peer);
-  };
-  pc.onicecandidate = ({ candidate }) => {
-    if (candidate) sendRoom(session, { type: "signal", to: peer.id, candidate: candidate.toJSON() });
-  };
-  // Perfect negotiation handles simultaneous offers and ICE restarts safely.
-  pc.onnegotiationneeded = async () => {
-    try {
-      peer.makingOffer = true;
-      await pc.setLocalDescription();
-      sendRoom(session, { type: "signal", to: peer.id, description: pc.localDescription });
-    } catch {
-      if (!session.closed && pc.signalingState !== "closed") setStatus(els.roomStatus, `Could not connect video to ${peer.name}. Try leaving and rejoining.`, "error");
-    } finally { peer.makingOffer = false; }
-  };
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === "failed") {
-      requestRelay(session, peer);
-    } else if (pc.connectionState === "disconnected") {
-      clearTimeout(peer.relayTimer);
-      peer.relayTimer = setTimeout(() => requestRelay(session, peer), 5000);
-    }
-  };
-  peer.relayTimer = setTimeout(() => {
-    if (pc.connectionState !== "connected") requestRelay(session, peer);
-  }, 5000);
-  return peer;
-}
-
-async function receiveSignal(session, message) {
-  const peer = session.peers.get(message.from);
-  if (!peer || peer.relay) return; // A person can leave while signals are in flight.
-  const pc = peer.pc;
-  if (message.description) {
-    const description = message.description;
-    const readyForOffer = !peer.makingOffer && (pc.signalingState === "stable" || peer.settingAnswer);
-    const collision = description.type === "offer" && !readyForOffer;
-    const polite = session.id > peer.id;
-    peer.ignoreOffer = !polite && collision;
-    if (peer.ignoreOffer) return;
-    peer.settingAnswer = description.type === "answer";
-    try { await pc.setRemoteDescription(description); } finally { peer.settingAnswer = false; }
-    for (const candidate of peer.candidates.splice(0)) await pc.addIceCandidate(candidate);
-    if (description.type === "offer") {
-      await pc.setLocalDescription();
-      sendRoom(session, { type: "signal", to: peer.id, description: pc.localDescription });
-    }
-  } else if (message.candidate && !peer.ignoreOffer) {
-    if (pc.remoteDescription) await pc.addIceCandidate(message.candidate);
-    else if (peer.candidates.length < 128) peer.candidates.push(message.candidate);
-  }
-}
-
-function stopPeerConnection(peer) {
-  clearTimeout(peer.relayTimer);
-  peer.pc.onconnectionstatechange = null;
-  peer.pc.ontrack = null;
-  peer.pc.onicecandidate = null;
-  peer.pc.onnegotiationneeded = null;
-  peer.pc.close();
-}
-
-function removePeer(session, id) {
-  const peer = session.peers.get(id);
-  if (!peer) return;
-  stopPeerConnection(peer);
-  peer.relayStream?.getTracks().forEach((track) => track.stop());
-  session.peers.delete(id);
-  removeTile(id);
-}
-
-function disposeRoom(session) {
-  session.closed = true;
-  session.cancelJoin?.();
-  session.socket?.close();
-  clearInterval(session.videoTimer);
-  session.captureNode?.disconnect();
-  session.audioSource?.disconnect();
-  session.audioContext?.close().catch(() => {});
-  if (session.captureVideo) session.captureVideo.srcObject = null;
-  session.stream?.getTracks().forEach((track) => track.stop());
-  for (const id of session.peers.keys()) removePeer(session, id);
-  if (room !== session) return;
-  room = null;
-  els.videos.replaceChildren();
-  els.chatSection.classList.remove("connected");
-  for (const button of [els.leave, els.mic, els.camera, els.copy, els.chatInput, els.chatForm.querySelector("button")]) button.disabled = true;
-  els.displayName.disabled = false;
-  els.room.disabled = false;
-  els.join.disabled = !config;
-  micOn = false;
-  cameraOn = false;
-  els.participants.textContent = "Not connected";
-  els.roomTitle.textContent = "Your lounge is waiting";
-}
-
-function connectRoom(session, name, roomName) {
-  const url = new URL(config.signalingPath, window.location.href);
-  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const socket = session.socket = new WebSocket(url);
-  socket.binaryType = "arraybuffer";
-  let messages = Promise.resolve();
-  return new Promise((resolveJoin, rejectJoin) => {
-    const timer = setTimeout(() => rejectJoin(new Error("The room connection timed out. Please try joining again.")), 15_000);
-    const reject = (error) => { clearTimeout(timer); rejectJoin(error); };
-    session.cancelJoin = () => reject(new Error("Joining cancelled."));
-    socket.onopen = () => sendRoom(session, { type: "join", name, room: roomName });
-    socket.onerror = () => reject(new Error("Could not connect to the room. Please try again."));
-    socket.onclose = () => {
-      reject(new Error("The room connection closed. Please try joining again."));
-      if (!session.closed) {
-        disposeRoom(session);
-        setStatus(els.roomStatus, "Your room connection closed. Rejoin to continue.", "pending");
-      }
-    };
-    socket.onmessage = (event) => {
-      if (typeof event.data !== "string") {
-        receiveMedia(session, event.data).catch(() => {});
-        return;
-      }
-      messages = messages.then(async () => {
-        if (session.closed) return;
-        const message = JSON.parse(event.data);
-        if (message.type === "joined") {
-          session.id = message.self.id;
-          session.name = message.self.name;
-          for (const peer of message.peers) addPeer(session, peer);
-          clearTimeout(timer);
-          resolveJoin();
-        } else if (message.type === "peer-joined") {
-          addPeer(session, message.peer);
-          updateParticipants();
-        } else if (message.type === "peer-left") {
-          removePeer(session, message.id);
-          updateParticipants();
-        } else if (message.type === "peer-media") {
-          const peer = session.peers.get(message.peer.id);
-          if (peer) { Object.assign(peer, message.peer); updateMedia(peer); }
-        } else if (message.type === "relay-ready") {
-          enableRelay(session, message.id);
-        } else if (message.type === "signal") await receiveSignal(session, message);
-        else if (message.type === "chat") addChatLine(message.name, message.text, message.from === session.id);
-        else if (message.type === "error") {
-          if (!session.id) reject(new Error(message.message));
-          else if (message.code !== "UNKNOWN_PEER") setStatus(els.roomStatus, message.message, "error");
-        }
-      }).catch(() => {
-        if (!session.closed) setStatus(els.roomStatus, "A video connection was interrupted. Try leaving and rejoining; room chat is still available.", "pending");
-      });
-    };
-  });
+  document.querySelector(`[data-identity="${CSS.escape(identity)}"]`)?.remove();
 }
 
 async function joinRoom() {
-  if (room || !config) return;
   const name = els.displayName.value.trim().slice(0, 28);
   const roomName = normalizeRoom(els.room.value);
   if (!name) return setStatus(els.roomStatus, "Add a display name first.", "error");
   if (!roomName || roomName.length < 3) return setStatus(els.roomStatus, "Use a room code with at least 3 letters or numbers.", "error");
-  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-    return setStatus(els.roomStatus, "Open this page over HTTPS (or localhost) to use your camera and microphone.", "error");
-  }
-  if (!window.RTCPeerConnection) return setStatus(els.roomStatus, "Use a current browser with video calling support.", "error");
-  const session = { peers: new Map(), closed: false };
-  room = session;
   els.join.disabled = true;
-  els.displayName.disabled = true;
-  els.room.disabled = true;
-  els.leave.disabled = false;
   els.room.value = roomName;
-  els.chatMessages.replaceChildren();
   setStatus(els.roomStatus, "Opening your room…", "pending");
 
   try {
-    session.audioContext = new AudioContext({ sampleRate: 16000 });
-    await session.audioContext.resume();
-    session.stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 360 } },
-      audio: { echoCancellation: true, noiseSuppression: true },
+    const response = await fetch("/api/room-token", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ room: roomName, name }),
     });
-    if (session.closed) { session.stream.getTracks().forEach((track) => track.stop()); return; }
-    await connectRoom(session, name, roomName);
-    if (session.closed) return;
+    const auth = await response.json();
+    if (!response.ok) throw new Error(auth.error || "Unable to join the room.");
+
+    room = new Room({ adaptiveStream: true, dynacast: true });
+    room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      if (track.kind === Track.Kind.Video) addVideoTile(participant.identity, participant.name || "Guest", track);
+      if (track.kind === Track.Kind.Audio) {
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.dataset.identity = participant.identity;
+        document.body.append(audio);
+        track.attach(audio);
+      }
+    });
+    room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+      track.detach().forEach((element) => element.remove());
+      if (track.kind === Track.Kind.Video) removeTile(participant.identity);
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      removeTile(participant.identity);
+      document.querySelectorAll(`audio[data-identity="${CSS.escape(participant.identity)}"]`).forEach((audio) => audio.remove());
+      updateParticipants();
+    });
+    room.on(RoomEvent.ParticipantConnected, updateParticipants);
+    room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
+      if (topic !== "chat") return;
+      try {
+        const message = JSON.parse(new TextDecoder().decode(payload));
+        if (message.type === "chat" && typeof message.text === "string") addChatLine(participant?.name || "Guest", message.text.slice(0, 400));
+      } catch {}
+    });
+    room.on(RoomEvent.Disconnected, () => setStatus(els.roomStatus, "You left the live lounge.", "pending"));
+
+    await room.connect(auth.livekitUrl, auth.token);
+    await room.localParticipant.enableCameraAndMicrophone();
     micOn = true;
     cameraOn = true;
     els.mic.textContent = "Mic on";
     els.camera.textContent = "Camera on";
-    els.mic.setAttribute("aria-pressed", "true");
-    els.camera.setAttribute("aria-pressed", "true");
-    addVideoTile(session.id, session.name, session.stream, true);
+    const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+    if (cameraTrack) addVideoTile(room.localParticipant.identity, auth.name, cameraTrack, true);
     els.roomTitle.textContent = `Live lounge · ${roomName}`;
     els.chatSection.classList.add("connected");
     els.leave.disabled = false;
@@ -466,40 +213,59 @@ async function joinRoom() {
     updateParticipants();
     history.replaceState(null, "", makeInvite(roomName));
   } catch (error) {
-    if (room === session) {
-      disposeRoom(session);
-      const message = error.name === "NotAllowedError" ? "Allow camera and microphone access in your browser, then join again."
-        : error.name === "NotFoundError" ? "No camera or microphone was found. Connect a device and try again."
-        : error.message || "Could not start video. Check camera permissions and try again.";
-      setStatus(els.roomStatus, message, "error");
+    if (room) {
+      for (const publication of room.localParticipant.trackPublications.values()) publication.track?.stop();
+      await room.disconnect().catch(() => {});
     }
+    room = null;
+    els.videos.replaceChildren();
+    setStatus(els.roomStatus, error.message || "Could not start video. Check camera permissions and try again.", "error");
+  } finally {
+    els.join.disabled = !config?.videoReady;
   }
 }
 
-function leaveRoom() {
-  if (room) disposeRoom(room);
+async function leaveRoom() {
+  if (room) {
+    for (const publication of room.localParticipant.trackPublications.values()) publication.track?.stop();
+    await room.disconnect();
+  }
+  room = null;
+  els.videos.replaceChildren();
+  document.querySelectorAll("audio[data-identity]").forEach((audio) => audio.remove());
+  els.chatSection.classList.remove("connected");
+  els.leave.disabled = true;
+  els.mic.disabled = true;
+  els.camera.disabled = true;
+  els.copy.disabled = true;
+  els.chatInput.disabled = true;
+  els.chatForm.querySelector("button").disabled = true;
+  micOn = false;
+  cameraOn = false;
+  els.participants.textContent = "Not connected";
   setStatus(els.roomStatus, "You left the live lounge.", "pending");
 }
 
 els.join.addEventListener("click", joinRoom);
 els.leave.addEventListener("click", leaveRoom);
-els.mic.addEventListener("click", () => {
+els.mic.addEventListener("click", async () => {
   if (!room) return;
   micOn = !micOn;
-  room.stream.getAudioTracks().forEach((track) => { track.enabled = micOn; });
+  await room.localParticipant.setMicrophoneEnabled(micOn);
   els.mic.textContent = micOn ? "Mic on" : "Mic muted";
   els.mic.setAttribute("aria-pressed", String(micOn));
-  updateMedia({ id: room.id, name: room.name, camera: cameraOn, microphone: micOn });
-  sendRoom(room, { type: "media", camera: cameraOn, microphone: micOn });
 });
-els.camera.addEventListener("click", () => {
+els.camera.addEventListener("click", async () => {
   if (!room) return;
   cameraOn = !cameraOn;
-  room.stream.getVideoTracks().forEach((track) => { track.enabled = cameraOn; });
+  await room.localParticipant.setCameraEnabled(cameraOn);
   els.camera.textContent = cameraOn ? "Camera on" : "Camera off";
   els.camera.setAttribute("aria-pressed", String(cameraOn));
-  updateMedia({ id: room.id, name: room.name, camera: cameraOn, microphone: micOn });
-  sendRoom(room, { type: "media", camera: cameraOn, microphone: micOn });
+  if (!cameraOn) removeTile(room.localParticipant.identity);
+  else {
+    const track = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+    if (track) addVideoTile(room.localParticipant.identity, els.displayName.value.trim() || "You", track, true);
+  }
 });
 els.copy.addEventListener("click", async () => {
   try {
@@ -509,15 +275,15 @@ els.copy.addEventListener("click", async () => {
     setStatus(els.roomStatus, `Room code: ${els.room.value}. Copy it and share it privately.`, "pending");
   }
 });
-els.chatForm.addEventListener("submit", (event) => {
+els.chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!room) return;
   const text = els.chatInput.value.trim().slice(0, 400);
   if (!text) return;
-  if (!sendRoom(room, { type: "chat", text })) return;
+  await room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: "chat", text })), { reliable: true, topic: "chat" });
+  addChatLine(els.displayName.value.trim() || "You", text, true);
   els.chatInput.value = "";
 });
-window.addEventListener("pagehide", () => { if (room) disposeRoom(room); });
 
 els.room.value = roomFromUrl();
 loadConfig().catch(() => setStatus(els.marketStatus, "Could not load the page settings."));

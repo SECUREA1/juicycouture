@@ -26,8 +26,10 @@
         <div class="hero-actions"><a class="button" href="#token">Meet your coin <span>✦</span></a><a class="button ghost" href="#rewards">Explore rewards</a></div>
         <div class="hero-footnote">Mint pending · no wallet connection or purchases on this page.</div>
       </div>
-      <div class="hero-art" aria-hidden="true"><div class="coin-aura"></div><div class="coin"><span class="coin-crown">♛</span><strong>JC</strong><small>MEME COIN</small><i>✦</i></div><div class="gem gem-one">✧</div><div class="gem gem-two">♡</div><div class="sparkle s1">✦</div><div class="sparkle s2">✧</div></div>
+      <div class="hero-art"><div class="coin-aura"></div><img class="coin-image" src="/graphics/coin-medallion.jpeg" alt="Jeweled Juicy Couture Coin medallion artwork"><div class="gem gem-one" aria-hidden="true">✧</div><div class="gem gem-two" aria-hidden="true">♡</div><div class="sparkle s1" aria-hidden="true">✦</div><div class="sparkle s2" aria-hidden="true">✧</div></div>
     </section>
+
+    <section class="brand-banner shell" aria-label="Juicy Couture Coin community artwork"><img src="/graphics/juicy-banner.jpeg" alt="Juicy Couture Coin banner: dripping in sweetness, wrapped in luxury, powered by community"></section>
 
     <section class="token-section" id="token">
       <div class="shell">
@@ -54,12 +56,12 @@
 
     <section class="lounge-section" id="live-room">
       <div class="shell lounge-layout">
-        <div class="lounge-intro"><div class="eyebrow">The Juicy Live Lounge</div><h2>Bring your voice.<br><em>Bring your people.</em></h2><p>Open a room for a community catch-up, breakfast plan, or celebration. Choose a room code and share the invite link with your crew.</p><div class="lounge-promises"><span>✦ Small-group video</span><span>✦ Built-in chat</span><span>✦ No recording by this app</span></div><div class="privacy-note">Your camera and microphone turn on only after you choose to join. Video connects through your browser and the room server. This app does not record your call.</div></div>
+        <div class="lounge-intro"><div class="eyebrow">The Juicy Live Lounge</div><h2>Bring your voice.<br><em>Bring your people.</em></h2><p>Open a room for a community catch-up, breakfast plan, or celebration. Choose a room code and share the invite link with your crew.</p><div class="lounge-promises"><span>✦ Small-group video</span><span>✦ Built-in chat</span><span>✦ No recording by this app</span></div><div class="privacy-note">Your camera and microphone turn on only after you choose to join. Video is handled by LiveKit; no recording feature is configured here.</div></div>
         <div class="lounge-card">
           <div class="lounge-header"><div><div class="card-eyebrow">Live community room</div><h3 id="room-title">Your lounge is waiting</h3></div><span class="room-status-dot"></span></div>
           <div class="join-fields"><label>Display name<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="Your name in the lounge"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="juicy-breakfast"></label></div>
-          <div class="lounge-actions"><button id="join-room" class="button" type="button" disabled>Join live room <span>↗</span></button><button id="copy-invite" class="button ghost" type="button" disabled>Copy invite</button></div>
-          <p id="room-status" class="status pending" role="status">Choose a name and room code, then join. Allow camera and microphone access when your browser asks.</p>
+          <div class="lounge-actions"><button id="join-room" class="button" type="button">Join live room <span>↗</span></button><button id="copy-invite" class="button ghost" type="button" disabled>Copy invite</button></div>
+          <p id="room-status" class="status pending" role="status">Video setup needed. Connect a LiveKit Cloud project in Render to turn on the lounge.</p>
           <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="true">Mic on</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="true">Camera on</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
           <div id="video-grid" class="video-grid" aria-live="polite"></div>
           <div class="chat-box"><div class="chat-heading">Room chat <span>Say hi ✨</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Write a friendly message…" aria-label="Message" disabled><button class="small-button send-button" type="submit" disabled>Send</button></form></div>
