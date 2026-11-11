@@ -3,14 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "esbuild client.js --bundle --minify --platform=browser --target=es2022 --outfile=public/app.js",
-    "start": "node server.js"
+    "build": "node scripts/build.js",
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "test:browser": "playwright test"
   },
   "dependencies": {
+    "@solana/spl-token": "0.4.15",
+    "@solana/web3.js": "1.99.0",
+    "@wallet-standard/app": "1.1.1",
+    "bs58": "6.0.0",
+    "buffer": "6.0.3",
     "esbuild": "0.25.10",
-    "livekit-client": "2.23.0",
-    "livekit-server-sdk": "2.19.3"
+    "ws": "8.22.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
   }
 }

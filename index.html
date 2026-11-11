@@ -1,76 +1,66 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#310817">
-  <meta name="description" content="Juicy Couture Coin community hub, Solana token dashboard, participation rewards, and live video lounge.">
-  <title>Juicy Couture Coin ($JCQ) · Live Lounge</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#230d21">
+  <meta name="description" content="JCQ Live: a little love, a little sparkle, and your people. Go live, share a room, and tip your host directly.">
+  <title>JCQ Live · Go live. Feel the love.</title>
+  <link rel="icon" href="/graphics/heart.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
 </head>
 <body>
-  <div class="announcement"><span>♛</span> JUICY COUTURE COIN <b>·</b> SOLANA COMMUNITY HUB <span>✦</span></div>
+  <a class="skip-link" href="#live-room">Skip to the live lounge</a>
+  <div class="announcement">A LITTLE SPARKLE. A LOT OF COMMUNITY. <span>✧</span> WELCOME TO YOUR HAPPY PLACE</div>
   <header class="site-header">
-    <a class="brand" href="#home" aria-label="Juicy Couture Coin home"><span class="brand-mark">JC</span><span>Juicy Couture<small>Community Coin</small></span></a>
-    <nav aria-label="Main navigation"><a href="#token">The coin</a><a href="#rewards">Rewards</a><a href="#live-room">Live lounge</a></nav>
-    <a class="nav-button" href="#live-room">Join the lounge <span>↗</span></a>
+    <a class="brand" href="#home" aria-label="JCQ Live home"><span class="brand-mark">♡</span><span>JCQ<span class="brand-live">live</span><small>JUICY COUTURE COIN</small></span></a>
+    <nav aria-label="Main navigation"><a href="#live-room">Live lounge</a><a href="#how-it-works">How it works</a><a href="#token">The JCQ chapter</a></nav>
+    <button class="wallet-button" id="connect-wallet" type="button"><span aria-hidden="true">◈</span><span id="wallet-label">Connect wallet</span></button>
   </header>
-
   <main id="home">
     <section class="hero shell">
-      <div class="hero-copy">
-        <div class="eyebrow"><span>✦</span> A little sparkle. A lot of community.</div>
-        <h1>Collect the crown.<br><em>Bring the sparkle.</em></h1>
-        <p>Juicy Couture Coin is an independent Solana community meme coin with an official real-life participation rewards schedule and a live room to bring the crew together.</p>
-        <div class="hero-actions"><a class="button" href="#token">Meet your coin <span>✦</span></a><a class="button ghost" href="#rewards">Explore rewards</a></div>
-        <div class="hero-footnote">Mint pending · no wallet connection or purchases on this page.</div>
+      <div class="hero-copy"><div class="eyebrow"><span class="tiny-dot"></span> YOUR PEOPLE. YOUR PLACE.</div>
+        <h1>Go live.<br>Feel the <em>love.</em><span class="heading-star" aria-hidden="true">✧</span></h1>
+        <p>Good conversations. Real connections. A little main-character energy. Bring your people together, and send a little love to the ones who make your day.</p>
+        <div class="hero-actions"><a class="button" id="hero-host" href="#live-room">Start your moment <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></a><a class="button ghost" href="#live-room">Find your room <span>♡</span></a></div>
+        <div class="hero-footnote"><span>✧ No video subscriptions</span><span>♡ Tips go straight to the host</span></div>
       </div>
-      <div class="hero-art"><div class="coin-aura"></div><img class="coin-image" src="/graphics/coin-medallion.jpeg" alt="Jeweled Juicy Couture Coin medallion artwork"><div class="gem gem-one" aria-hidden="true">✧</div><div class="gem gem-two" aria-hidden="true">♡</div><div class="sparkle s1" aria-hidden="true">✦</div><div class="sparkle s2" aria-hidden="true">✧</div></div>
+      <div class="hero-art"><img src="/graphics/love-crown.png" width="1536" height="1024" alt="A glossy pink heart wearing a golden crown, surrounded by little hearts and sparkling stars" fetchpriority="high"><div class="art-note"><span>♡</span><div>A little love, delivered.<small>Made for moments worth sharing.</small></div><b>✧</b></div></div>
     </section>
-
-    <section class="brand-banner shell" aria-label="Juicy Couture Coin community artwork"><img src="/graphics/juicy-banner.jpeg" alt="Juicy Couture Coin banner: dripping in sweetness, wrapped in luxury, powered by community"></section>
-
-    <section class="token-section" id="token">
-      <div class="shell">
-        <div class="section-title row-title"><div><div class="eyebrow">The coin · Solana</div><h2>One pretty little token.<br><em>A whole community behind it.</em></h2></div><div id="launch-status" class="launch-pill">Checking launch status…</div></div>
-        <div class="token-grid">
-          <article class="token-card identity-card"><div class="card-eyebrow">Official project details</div><h3 id="coin-name">Juicy Couture Coin</h3><div class="symbol-line"><span id="coin-symbol">$JCQ</span><span class="chain-pill" id="network">Solana</span></div><div class="mint-label">Official mint address</div><code id="mint-address">Pending official mint</code><p>Always verify the complete mint address before interacting with any token. Ticker symbols can be reused.</p></article>
-          <article class="token-card market-card"><div class="market-top"><div><div class="card-eyebrow">Live market snapshot</div><h3>Solana market</h3></div><span class="live-dot" aria-hidden="true"></span></div><div class="market-metrics"><div class="metric"><small>Price</small><strong id="price">—</strong></div><div class="metric"><small>FDV</small><strong id="fdv">—</strong></div><div class="metric"><small>Liquidity</small><strong id="liquidity">—</strong></div><div class="metric"><small>24h volume</small><strong id="volume">—</strong></div><div class="metric"><small>24h change</small><strong id="change" class="metric-value">—</strong></div></div><div id="market-status" class="market-note">Waiting for the verified mint address.</div><a id="market-link" class="market-link" href="#" target="_blank" rel="noopener noreferrer" hidden>View market chart ↗</a></article>
-        </div>
-        <div class="source-note">Market figures are third-party estimates and can be delayed or incomplete. The project does not promise a price, return, or liquidity level.</div>
-      </div>
-    </section>
-
-    <section class="rewards-section" id="rewards">
-      <div class="shell">
-        <div class="section-title"><div class="eyebrow">Official Juicy Moments</div><h2>Show up. Join in.<br><em>Get your moment.</em></h2><p>Participation is what gives the community its sparkle. Each approved gathering can recognize the people who are there, lend a hand, and help the circle grow.</p></div>
-        <div class="reward-grid">
-          <article class="reward-card"><div class="reward-icon">🥐</div><div class="reward-amount">$2</div><h3>Breakfast Bloom</h3><p>CAD-value in coin for verified attendance at an approved community breakfast.</p><span class="reward-badge">Sweet Start · attendance badge</span></article>
-          <article class="reward-card featured"><div class="reward-icon">♡</div><div class="reward-amount">Up to $5</div><h3>Helping Hands / Good Vibes</h3><p>CAD-value in coin for useful event help, welcoming people, positive engagement, and thoughtful participation.</p><span class="reward-badge">Helping Heart · participation badge</span></article>
-          <article class="reward-card"><div class="reward-icon">👑</div><div class="reward-amount">Up to $10</div><h3>Community Builder</h3><p>CAD-value in coin for organizing an activity, connecting people, and helping the community grow.</p><span class="reward-badge">Crown Builder · community badge</span></article>
-        </div>
-        <p class="reward-rules">A gathering host verifies attendance and contributions. Only the highest eligible tier applies per person per gathering, up to $10 CAD-value; tiers do not stack. Rewards are manually reviewed and issued on published distribution dates after the token payout process is live. This page does not track balances or send rewards.</p>
-      </div>
-    </section>
-
+    <div class="values-strip"><div class="shell"><span>GOOD ENERGY, ALWAYS</span><span>♡ <b>Your room. Your people.</b></span><span>✧ <b>Live video & built-in chat</b></span><span>◈ <b>Wallet-to-wallet support</b></span></div></div>
     <section class="lounge-section" id="live-room">
-      <div class="shell lounge-layout">
-        <div class="lounge-intro"><div class="eyebrow">The Juicy Live Lounge</div><h2>Bring your voice.<br><em>Bring your people.</em></h2><p>Open a room for a community catch-up, breakfast plan, or celebration. Choose a room code and share the invite link with your crew.</p><div class="lounge-promises"><span>✦ Small-group video</span><span>✦ Built-in chat</span><span>✦ No recording by this app</span></div><div class="privacy-note">Your camera and microphone turn on only after you choose to join. Video is handled by LiveKit; no recording feature is configured here.</div></div>
-        <div class="lounge-card">
-          <div class="lounge-header"><div><div class="card-eyebrow">Live community room</div><h3 id="room-title">Your lounge is waiting</h3></div><span class="room-status-dot"></span></div>
-          <div class="join-fields"><label>Display name<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="Your name in the lounge"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="juicy-breakfast"></label></div>
-          <div class="lounge-actions"><button id="join-room" class="button" type="button">Join live room <span>↗</span></button><button id="copy-invite" class="button ghost" type="button" disabled>Copy invite</button></div>
-          <p id="room-status" class="status pending" role="status">Video setup needed. Connect a LiveKit Cloud project in Render to turn on the lounge.</p>
-          <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="true">Mic on</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="true">Camera on</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
-          <div id="video-grid" class="video-grid" aria-live="polite"></div>
-          <div class="chat-box"><div class="chat-heading">Room chat <span>Say hi ✨</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Write a friendly message…" aria-label="Message" disabled><button class="small-button send-button" type="submit" disabled>Send</button></form></div>
+      <div class="shell">
+        <div class="section-heading"><div><div class="eyebrow">THE JUICY LIVE LOUNGE</div><h2>A front-row seat to<br><em>your favorite people.</em></h2></div><p>Start a room, share your invite, and make it a moment.<br>Camera on. Good vibes only.</p></div>
+        <div class="lounge-layout">
+          <div class="lounge-card">
+            <div class="lounge-header"><div><span class="live-badge" id="room-badge"><i></i> YOUR LIVE SPACE</span><h3 id="room-title">Your lounge is waiting</h3></div><span class="room-monogram" aria-hidden="true">♡</span></div>
+            <div class="join-fields"><label>Your name<input id="display-name" maxlength="28" autocomplete="nickname" placeholder="What should we call you?"></label><label>Room code<input id="room-code" maxlength="40" autocomplete="off" placeholder="Your private room code"></label></div>
+            <div class="lounge-actions"><button id="host-room" class="button" type="button" disabled>Go live <span>✧</span></button><button id="join-room" class="button outline" type="button" disabled>Join a room <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></button><button id="copy-invite" class="text-button" type="button" disabled>Copy invite <span>⧉</span></button></div>
+            <p id="room-status" class="status pending" role="status">Choose a name and room code, then go live or join your people.</p>
+            <div class="stage-wrap"><div id="video-empty" class="video-empty"><div class="empty-hearts" aria-hidden="true"><span>♡</span><i>✧</i><b>♡</b></div><h4>This is where the magic happens.</h4><p>Your camera starts when you choose to join.<br>Just bring yourself. We’ll bring the sparkle.</p></div><div id="video-grid" class="video-grid" aria-live="polite"></div><div id="hearts-layer" class="hearts-layer" aria-hidden="true"></div></div>
+            <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="true">Mic on</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="true">Camera on</button><button id="send-love" class="small-button love-button" type="button" disabled aria-label="Send a heart reaction">♡ Love</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
+            <details id="host-settings" class="host-settings" hidden><summary>Your host payout settings <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></summary><p>Designate the Solana wallet where viewers’ tips should arrive. Your full receiving address is shown before every tip.</p><label>Receiving wallet<input id="host-wallet" autocomplete="off" spellcheck="false" placeholder="A Solana wallet address"></label><div class="host-wallet-actions"><button id="use-wallet" class="small-button" type="button">Use my connected wallet</button><button id="save-host-wallet" class="small-button primary-small" type="button">Save receiving wallet</button></div><p id="host-wallet-status" class="status" role="status"></p></details>
+            <div class="chat-box"><div class="chat-heading"><span>THE GROUP CHAT</span><span>Keep it kind ♡</span></div><ul id="chat-messages" class="chat-messages" aria-live="polite"></ul><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="400" placeholder="Say something lovely…" aria-label="Message" disabled><button class="small-button send-button" type="submit" disabled aria-label="Send message"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></button></form></div>
+          </div>
+          <aside class="tip-column">
+            <div class="tip-card"><div class="tip-heading"><span class="tip-heart" aria-hidden="true">♡</span><span class="pill" id="tip-network">SOLANA</span></div><div class="eyebrow">A LITTLE APPRECIATION</div><h3>Make their <em>day.</em></h3><p>Love the conversation? Send a little support straight to your host’s wallet.</p>
+              <div class="host-identity"><span class="host-avatar" aria-hidden="true">♛</span><div><b id="host-name">Your lovely host</b><small id="host-state">Join a hosted room to send a tip</small></div><span class="host-flower" aria-hidden="true">✧</span></div>
+              <div class="payout-display"><span>HOST’S RECEIVING WALLET</span><code id="payout-address">Not designated yet</code></div>
+              <form id="tip-form"><label>Send a little love <select id="tip-asset" aria-label="Tip currency"><option value="SOL">SOL</option><option id="jcq-option" value="JCQ" disabled>JCQ · coming soon</option></select></label><div class="amount-presets"><button type="button" data-amount="0.005">0.005 <small>SOL</small></button><button type="button" data-amount="0.01" class="selected">0.01 <small>SOL</small></button><button type="button" data-amount="0.05">0.05 <small>SOL</small></button></div><label class="amount-input"><span>Amount</span><input id="tip-amount" type="text" inputmode="decimal" value="0.01" autocomplete="off" aria-label="Tip amount"></label><button id="review-tip" class="button tip-button" type="submit" disabled>Review your tip <span>♡</span></button></form>
+              <p id="tip-status" class="tip-status" role="status">Connect a wallet, then join a host’s room to send support.</p><a id="tip-receipt" class="receipt-link" hidden target="_blank" rel="noopener noreferrer">View transaction receipt ↗</a><div class="tip-note"><span>◈</span> You approve every payment in your wallet.<br>Network fees apply. No platform fee.</div>
+            </div>
+            <div class="kindness-card"><span>✧</span><div>Big hearts. Good company.<p>Sometimes a kind word is the best tip of all.</p></div></div>
+            <div class="tip-activity"><div class="chat-heading">LITTLE MOMENTS OF LOVE</div><ul id="tip-events"><li class="activity-empty">Confirmed tips will appear here. Be someone’s bright spot.</li></ul></div>
+          </aside>
         </div>
+        <p class="privacy-note">Your camera and microphone start only when you join and allow access. Calls are not recorded by this app. Share your room invite with people you trust.</p>
       </div>
     </section>
-
-    <section class="launch-section"><div class="shell launch-inner"><div><div class="eyebrow">An independent community project</div><h2>Keep it juicy.<br><em>Keep it kind.</em></h2><p>Not affiliated with, endorsed by, or sponsored by Juicy Couture or its owners. Crypto assets are volatile and may lose all value. The reward schedule does not promise token-price growth.</p></div><a id="community-link" class="button ghost" href="#" target="_blank" rel="noopener noreferrer" hidden>Join the community ↗</a></div></section>
+    <section class="how-section shell" id="how-it-works"><div class="section-heading"><div><div class="eyebrow">IT’S A WHOLE LITTLE WORLD</div><h2>Come as you are.<br><em>Leave a little happier.</em></h2></div><span class="section-spark" aria-hidden="true">✧</span></div><div class="how-grid"><article><span class="step-number">01</span><div class="step-icon">◉</div><h3>Find your people.</h3><p>Go live with your own room or join a friend’s invite. No video-service account needed.</p></article><article><span class="step-number">02</span><div class="step-icon">♡</div><h3>Share the good stuff.</h3><p>Catch up on camera, plan your next gathering, and let the conversation go somewhere lovely.</p></article><article><span class="step-number">03</span><div class="step-icon">✧</div><h3>Send a little sparkle.</h3><p>Connect Phantom or a Solana-capable MetaMask account and tip the host directly. Always your choice.</p></article></div></section>
+    <section class="community-section" id="token"><div class="shell"><div class="community-top"><div><div class="eyebrow">THE JCQ CHAPTER</div><h2>Rooted in community.<br><em>Dressed in a little extra.</em></h2><p id="coin-name">Juicy Couture Coin</p><p>The next chapter is on its way. Official JCQ details and transfer availability will be shared here when ready.</p><div class="chapter-pill"><span>✧</span> JCQ transfers open when official token details are available</div><a id="community-link" class="button outline" href="#" target="_blank" rel="noopener noreferrer" hidden>Join the community ↗</a></div><img class="community-coin" src="/graphics/coin-medallion.jpeg" width="1254" height="1254" alt="Juicy Couture Coin community medallion with jeweled crown, pink poodles and a heart charm" loading="lazy"></div><figure class="brand-banner"><img src="/graphics/juicy-banner.jpeg" width="1536" height="512" alt="Juicy Couture community banner in pink velvet and gold, featuring the community coin and crown" loading="lazy"><figcaption>Independent community artwork. Participation rewards and token details will be published separately.</figcaption></figure></div></section>
+    <section class="closing-section shell"><span aria-hidden="true">♡</span><h2>Life’s better<br><em>with your people.</em></h2><a class="button" href="#live-room">Find your happy place <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></a></section>
   </main>
-  <footer><div class="shell footer-line"><span>Juicy Couture Coin ♛</span><span>Independent Solana community meme coin · Mint pending</span><span>© 2026 · Keep it kind</span></div></footer>
+  <footer><div class="shell footer-line"><a class="brand" href="#home">JCQ<span class="brand-live">live</span></a><p>An independent community project. Not affiliated with or endorsed by Juicy Couture.<br>Crypto assets can lose value. Tips are voluntary transfers, not investments or promised rewards.</p><span>MADE WITH A LITTLE ♡<br>© 2026 JCQ LIVE</span></div></footer>
+  <dialog id="wallet-dialog" class="modal"><div class="modal-top"><span class="eyebrow">YOUR WALLET. YOUR CHOICE.</span><button type="button" class="close-modal" data-close="wallet-dialog" aria-label="Close wallet choices">×</button></div><h2>A little connection.</h2><p>Choose a Solana wallet to connect. Connecting never sends funds.</p><div id="wallet-options" class="wallet-options"></div><p id="wallet-status" class="status" role="status"></p><p class="modal-note">MetaMask needs Solana support enabled. Ethereum 0x addresses cannot receive SOL or JCQ tips.</p><button id="disconnect-wallet" class="text-button" type="button" hidden>Disconnect this wallet</button></dialog>
+  <dialog id="tip-dialog" class="modal"><div class="modal-top"><span class="eyebrow">A LITTLE LOVE, SENT DIRECT.</span><button type="button" class="close-modal" data-close="tip-dialog" aria-label="Close tip review">×</button></div><h2>One lovely little tip.</h2><div id="tip-review" class="tip-review"></div><p class="modal-note">Review the amount, network, and full receiving address. Your wallet will ask you to approve the transfer. Network fees are additional.</p><button id="approve-tip" class="button tip-button" type="button">Continue to wallet ♡</button><p id="approval-status" class="status" role="status"></p></dialog>
 </body>
 </html>

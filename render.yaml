@@ -2,9 +2,10 @@ services:
   - type: web
     name: juicy-couture-coin-live
     runtime: node
-    buildCommand: npm install --no-audit --no-fund && npm run build
+    buildCommand: npm ci --no-audit --no-fund && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
+    numInstances: 1
     envVars:
       - key: NODE_VERSION
         value: 22.14.0
@@ -14,11 +15,5 @@ services:
         value: JCQ
       - key: COIN_NETWORK
         value: Solana
-      - key: LIVEKIT_URL
-        sync: false
-      - key: LIVEKIT_API_KEY
-        sync: false
-      - key: LIVEKIT_API_SECRET
-        sync: false
       - key: MAX_ROOM_PARTICIPANTS
         value: 8

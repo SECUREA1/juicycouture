@@ -1,4 +1,6 @@
 node_modules/
 .env
 .DS_Store
-public/app.js
+public/
+test-results/
+playwright-report/

@@ -42,7 +42,7 @@ process uses `ICE_SERVERS=[]` and needs no external STUN or TURN service.
 To check the container itself:
 
 ```bash
-BROWSER_BASE_URL=http://127.0.0.1:3000 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:browser
+BROWSER_BASE_URL=http://127.0.0.1:3000 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:browser -- e2e/video-room.spec.js e2e/design.spec.js
 ```
 
 Production hosting must provide HTTPS and forward WebSockets to this one Node
@@ -55,3 +55,11 @@ Do not invent a token mint or credentials.
 
 These repository instructions do not establish publication of a reusable cloud
 environment configuration or snapshot.
+
+Wallet tests run through scripts/browser-test-server.js with a local simulated
+Solana devnet RPC endpoint and ephemeral test keys. No real funds are sent.
+The production default is mainnet-beta; live payments require outbound HTTPS to
+api.mainnet-beta.solana.com (or api.devnet.solana.com when configured for devnet).
+Those destinations were blocked by the managed network policy during setup.
+TOKEN_MINT remains blank and JCQ transfers disabled until official details exist.
+Hosts set their own receiving wallet through the Go live room controls.

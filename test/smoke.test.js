@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { openRoomSocket } from "../scripts/room-socket.js";
+import { Keypair } from "@solana/web3.js";
 
 test("built app and rooms work without media-service credentials", { timeout: 30_000 }, async (t) => {
   const child = spawn(process.execPath, ["server.js"], { env: {
@@ -54,6 +55,15 @@ test("built app and rooms work without media-service credentials", { timeout: 30
 
   await t.test("rejects WebSocket connections from other sites", async () => {
     await assert.rejects(openRoomSocket(base, { origin: "https://another.example" }), /403/);
+  });
+
+  await t.test("serves all original and new graphics from the built application", async () => {
+    for (const [name, type] of [["coin-medallion.jpeg", "image/jpeg"], ["juicy-banner.jpeg", "image/jpeg"], ["love-crown.png", "image/png"], ["heart.svg", "image/svg+xml"]]) {
+      const response = await fetch(`${base}/graphics/${name}`);
+      assert.equal(response.status, 200);
+      assert.ok(response.headers.get("content-type").includes(type));
+      assert.ok((await response.arrayBuffer()).byteLength > 100);
+    }
   });
 
   await t.test("validates joins and handles malformed JSON without crashing", async (t) => {
@@ -150,5 +160,36 @@ test("built app and rooms work without media-service credentials", { timeout: 30
     assert.equal(samples.toString("ascii", 1, 37), b.self.id);
     assert.equal(samples.readInt16LE(41), 32767);
     await assert.rejects(outsider.next("media", 100), /Timed out/);
+  });
+
+  await t.test("host payout controls are private, guest-proof and resumable", async (t) => {
+    const host = await client(t), guest = await client(t);
+    host.send({ type: "join", room: "hosted-room", name: "Host", hosting: true });
+    const started = await host.next("joined");
+    assert.equal(started.self.isHost, true);
+    assert.ok(started.hostKey);
+    guest.send({ type: "join", room: "hosted-room", name: "Impostor", hosting: true });
+    assert.equal((await guest.next("error")).code, "HOST_TAKEN");
+    const visitor = await join(guest, "hosted-room", "Guest");
+    assert.equal(visitor.hostKey, undefined);
+    assert.equal(visitor.self.isHost, false);
+    const wallet = Keypair.generate().publicKey.toBase58();
+    guest.send({ type: "host-wallet", wallet });
+    assert.equal((await guest.next("error")).code, "HOST_ONLY");
+    host.send({ type: "host-wallet", wallet: "0x123" });
+    assert.equal((await host.next("error")).code, "INVALID_WALLET");
+    host.send({ type: "host-wallet", wallet });
+    assert.equal((await host.next("host-updated")).host.wallet, wallet);
+    assert.equal((await guest.next("host-updated")).host.wallet, wallet);
+    guest.send({ type: "tip-receipt", recipient: wallet, asset: "SOL", signature: "not-a-real-signature" });
+    assert.equal((await guest.next("error")).code, "TIP_UNVERIFIED");
+    await host.close();
+    assert.equal((await guest.next("host-updated")).host.online, false);
+    const returning = await client(t);
+    returning.send({ type: "join", room: "hosted-room", name: "Host returned", hosting: true, hostKey: started.hostKey });
+    const resumed = await returning.next("joined");
+    assert.equal(resumed.self.isHost, true);
+    assert.equal(resumed.host.wallet, wallet);
+    assert.equal(resumed.hostKey, started.hostKey);
   });
 });

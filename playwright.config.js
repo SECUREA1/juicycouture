@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   webServer: process.env.BROWSER_BASE_URL ? undefined : {
-    command: "npm start",
+    command: "node scripts/browser-test-server.js",
     env: { PORT: "3100", ICE_SERVERS: "[]", TOKEN_MINT: "" },
     url: "http://127.0.0.1:3100/healthz",
     timeout: 15_000,
