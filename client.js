@@ -1,3 +1,6 @@
+import { initFeed } from "./feed-client.js";
+import { initSwaps } from "./swap-client.js";
+import { initDrops } from "./drops-client.js";
 import { initWalletUI } from "./wallet-ui.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -19,7 +22,7 @@ function setStatus(element, message, kind = "") {
   element.className = `status ${kind}`.trim();
 }
 function roomFromUrl() {
-  return new URLSearchParams(location.search).get("room") || `juicy-${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+  return new URLSearchParams(location.search).get("room") || "juicy-live";
 }
 function normalizeRoom(raw) {
   return String(raw || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -58,10 +61,14 @@ async function loadConfig() {
   if (!response.ok) throw new Error("Could not load the lounge settings. Refresh to try again.");
   config = await response.json();
   els.coinName.textContent = config.coinName;
+  if (!new URLSearchParams(location.search).get("room")) els.room.value = config.defaultRoom || "juicy-live";
   if (config.communityUrl) {
     try { const url = new URL(config.communityUrl); if (url.protocol === "https:") { els.communityLink.href = url; els.communityLink.hidden = false; } } catch {}
   }
   walletUI = initWalletUI({ config, getRoom: () => room, send: (message) => room ? sendRoom(room, message) : false, onTip: () => hearts(15) });
+  initFeed({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe });
+  initSwaps({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });
+  initDrops({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });
   els.join.disabled = false;
   els.hostStart.disabled = false;
 }
@@ -145,7 +152,7 @@ function sendMedia(session, kind, bytes) {
 }
 
 async function startRelayCapture(session) {
-  if (session.captureStarted) return;
+  if (session.captureStarted || !session.stream.getTracks().length) return;
   session.captureStarted = true;
   const video = session.captureVideo = document.createElement("video");
   video.muted = true;
@@ -326,6 +333,7 @@ function disposeRoom(session) {
   els.room.disabled = false;
   els.join.disabled = !config;
   els.hostStart.disabled = !config;
+  $("#join-with-media").disabled = false;
   walletUI?.update();
   micOn = false;
   cameraOn = false;
@@ -343,7 +351,7 @@ function connectRoom(session, name, roomName) {
     const timer = setTimeout(() => rejectJoin(new Error("The room connection timed out. Please try joining again.")), 15_000);
     const reject = (error) => { clearTimeout(timer); rejectJoin(error); };
     session.cancelJoin = () => reject(new Error("Joining cancelled."));
-    socket.onopen = () => sendRoom(session, { type: "join", name, room: roomName, hosting: session.hosting, hostKey: savedHostKey(roomName) });
+    socket.onopen = () => sendRoom(session, { type: "join", name, room: roomName, hosting: session.hosting, camera: !session.watching, microphone: !session.watching, hostKey: savedHostKey(roomName) });
     socket.onerror = () => reject(new Error("Could not connect to the room. Please try again."));
     socket.onclose = () => {
       reject(new Error("The room connection closed. Please try joining again."));
@@ -405,7 +413,7 @@ function connectRoom(session, name, roomName) {
 
 async function joinRoom(hosting = false) {
   if (room || !config) return;
-  const name = els.displayName.value.trim().slice(0, 28);
+  const name = els.displayName.value.trim().slice(0, 28) || (hosting ? "Host" : "Guest");
   const roomName = normalizeRoom(els.room.value);
   if (!name) return setStatus(els.roomStatus, "Add a display name first.", "error");
   if (!roomName || roomName.length < 3) return setStatus(els.roomStatus, "Use a room code with at least 3 letters or numbers.", "error");
@@ -413,10 +421,11 @@ async function joinRoom(hosting = false) {
     return setStatus(els.roomStatus, "Open this page over HTTPS (or localhost) to use your camera and microphone.", "error");
   }
   if (!window.RTCPeerConnection) return setStatus(els.roomStatus, "Use a current browser with video calling support.", "error");
-  const session = { peers: new Map(), closed: false, hosting, code: roomName };
+  const session = { peers: new Map(), closed: false, hosting, code: roomName, watching: !hosting && !$("#join-with-media").checked };
   room = session;
   els.join.disabled = true;
   els.hostStart.disabled = true;
+  $("#join-with-media").disabled = true;
   els.displayName.disabled = true;
   els.room.disabled = true;
   els.leave.disabled = false;
@@ -427,31 +436,31 @@ async function joinRoom(hosting = false) {
   try {
     session.audioContext = new AudioContext({ sampleRate: 16000 });
     await session.audioContext.resume();
-    session.stream = await navigator.mediaDevices.getUserMedia({
+    session.stream = session.watching ? new MediaStream() : await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 640 }, height: { ideal: 360 } },
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     if (session.closed) { session.stream.getTracks().forEach((track) => track.stop()); return; }
     await connectRoom(session, name, roomName);
     if (session.closed) return;
-    micOn = true;
-    cameraOn = true;
-    els.mic.textContent = "Mic on";
-    els.camera.textContent = "Camera on";
-    els.mic.setAttribute("aria-pressed", "true");
-    els.camera.setAttribute("aria-pressed", "true");
-    addVideoTile(session.id, session.name, session.stream, true);
+    micOn = !session.watching;
+    cameraOn = !session.watching;
+    els.mic.textContent = micOn ? "Mic on" : "Mic muted";
+    els.camera.textContent = cameraOn ? "Camera on" : "Camera off";
+    els.mic.setAttribute("aria-pressed", String(micOn));
+    els.camera.setAttribute("aria-pressed", String(cameraOn));
+    if (!session.watching) addVideoTile(session.id, session.name, session.stream, true);
     els.roomTitle.textContent = `Live lounge · ${roomName}`;
     els.chatSection.classList.add("connected");
     els.leave.disabled = false;
-    els.mic.disabled = false;
-    els.camera.disabled = false;
+    els.mic.disabled = session.watching;
+    els.camera.disabled = session.watching;
     els.copy.disabled = false;
     els.love.disabled = false;
     walletUI?.update();
     els.chatInput.disabled = false;
     els.chatForm.querySelector("button").disabled = false;
-    setStatus(els.roomStatus, "You’re live. Say hello and enjoy the room.", "success");
+    setStatus(els.roomStatus, session.watching ? "You’re watching live with your camera off. Chat and tips are ready." : "You’re live. Say hello and enjoy the room.", "success");
     updateParticipants();
     history.replaceState(null, "", makeInvite(roomName));
   } catch (error) {

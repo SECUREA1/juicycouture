@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import nacl from "tweetnacl";
+import sharp from "sharp";
 import { Keypair, Transaction, SystemInstruction } from "@solana/web3.js";
 
 // Payment browser tests use the local fixture and never target a hosted chain.
@@ -11,17 +13,20 @@ async function mockWallet(context, name, payer, signed) {
     tx.sign(payer);
     return Array.from(tx.serialize());
   });
+  await context.exposeBinding("signTestMessage", async (_, bytes) => Array.from(nacl.sign.detached(Uint8Array.from(bytes), payer.secretKey)));
   await context.addInitScript(({ name, address, key }) => {
     if (name === "Phantom") {
       window.phantom = { solana: {
         isPhantom: true,
+        signMessage: async (message) => ({ signature: Uint8Array.from(await window.signTestMessage(Array.from(message))) }),
         connect: async () => ({ publicKey: { toString: () => address } }),
         signTransaction: async (tx) => tx.constructor.from(Uint8Array.from(await window.signTestTransaction(Array.from(tx.serialize({ requireAllSignatures: false }))))),
       } };
     } else {
-      const account = { address, publicKey: Uint8Array.from(key), chains: ["solana:devnet"], features: ["solana:signTransaction"] };
+      const account = { address, publicKey: Uint8Array.from(key), chains: ["solana:devnet"], features: ["solana:signTransaction", "solana:signMessage"] };
       const wallet = { version: "1.0.0", name: "MetaMask", icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>", chains: ["solana:devnet"], accounts: [], features: {
         "standard:connect": { version: "1.0.0", connect: async () => ({ accounts: [account] }) },
+        "solana:signMessage": { version: "1.0.0", signMessage: async ({ message }) => [{ signedMessage: message, signature: Uint8Array.from(await window.signTestMessage(Array.from(message))) }] },
         "standard:events": { version: "1.0.0", on: () => () => {} },
         "solana:signTransaction": { version: "1.0.0", signTransaction: async ({ transaction }) => [{ signedTransaction: Uint8Array.from(await window.signTestTransaction(Array.from(transaction))) }] },
       } };
@@ -95,4 +100,27 @@ test("an Ethereum-only MetaMask connection is not used for Solana payments", asy
   await expect(page.locator("#wallet-status")).toContainText("Solana support was not detected");
   expect(await page.evaluate(() => window.ethereumCalls)).toBe(0);
   await expect(page.locator("#wallet-label")).toHaveText("Connect wallet");
+});
+
+
+test("the shared connected wallet can sign in, post and delete a community photo without a payment", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL });
+  const signed = [];
+  await mockWallet(context, "Phantom", Keypair.generate(), signed);
+  try {
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.locator("#join-room")).toBeEnabled();
+    await page.locator("#connect-wallet").click();
+    await page.getByRole("button", { name: /Phantom/ }).click();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#eab1ca" } }).png().toBuffer();
+    await page.locator("#feed-image").setInputFiles({ name: "community.png", mimeType: "image/png", buffer: image });
+    await page.locator("#feed-caption").fill("A lovely shared moment");
+    await page.locator("#feed-submit").click();
+    await expect(page.locator("#feed-posts")).toContainText("A lovely shared moment");
+    expect(signed).toHaveLength(0);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator(".feed-delete").first().click();
+    await expect(page.locator("#feed-posts")).not.toContainText("A lovely shared moment");
+  } finally { await context.close(); }
 });

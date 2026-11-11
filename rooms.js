@@ -120,7 +120,7 @@ export function attachRoomServer(server, { maxParticipants, validateWallet, veri
           return error("HOST_TAKEN", "This room already has a host. Join as a guest or start a new room.");
         }
         const peers = Array.from(members.values(), publicMember);
-        member = { id: randomUUID(), name, room, socket, camera: true, microphone: true, isHost: hosting, relayPeers: new Set() };
+        member = { id: randomUUID(), name, room, socket, camera: message.camera !== false, microphone: message.microphone !== false, isHost: hosting, relayPeers: new Set() };
         if (hosting) {
           state.hostKey ||= randomUUID();
           state.hostId = member.id;
@@ -216,4 +216,10 @@ export function attachRoomServer(server, { maxParticipants, validateWallet, veri
     for (const socket of sockets.clients) socket.terminate();
     sockets.close();
   });
+  return { listParticipants(roomName) {
+    return Array.from(rooms.get(roomName)?.members.values() || [], (member) => ({
+      identity: member.id, name: member.name, state: 2, tracks: [{ type: 1, muted: !member.camera }],
+    }));
+  } };
+
 }

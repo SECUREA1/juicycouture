@@ -5,6 +5,7 @@ async function join(page, name, room) {
   await expect(page.locator("#join-room")).toBeEnabled();
   await page.locator("#display-name").fill(name);
   await page.locator("#room-code").fill(room);
+  await page.locator("#join-with-media").check();
   await page.locator("#join-room").click();
   await expect(page.locator("#live-room")).toHaveClass(/connected/);
 }
@@ -92,6 +93,7 @@ test("camera denial gives a useful message and allows another join attempt", asy
   await page.goto("/");
   await page.locator("#display-name").fill("Permission test");
   await expect(page.locator("#join-room")).toBeEnabled();
+  await page.locator("#join-with-media").check();
   await page.locator("#join-room").click();
   await expect(page.locator("#room-status")).toContainText("Allow camera and microphone access");
   await expect(page.locator("#join-room")).toBeEnabled();

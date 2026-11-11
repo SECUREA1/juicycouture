@@ -1,3 +1,4 @@
+import { serverFetch } from "./network.js";
 import bs58 from "bs58";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -9,7 +10,7 @@ export function createPayments({ rpcUrl, cluster, mint = "" }) {
   const endpoint = new URL(rpcUrl);
   if (endpoint.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includes(endpoint.hostname)) throw new Error("SOLANA_RPC_URL must use HTTPS.");
   async function rpc(method, params = [], id = 1) {
-    const response = await fetch(endpoint, {
+    const response = await serverFetch(endpoint, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id, method, params }), signal: AbortSignal.timeout(12_000),
     });

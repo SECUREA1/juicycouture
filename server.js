@@ -4,6 +4,11 @@ import { extname, resolve, sep } from "node:path";
 import { attachRoomServer } from "./rooms.js";
 import { createPayments } from "./payments.js";
 import { walletAddress } from "./transactions.js";
+import { createTipsService } from "./tips.js";
+import { createSwapService } from "./swaps.js";
+import { createFeedService } from "./feed.js";
+import { createDropService } from "./drops.js";
+import { serverFetch } from "./network.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = resolve("public");
@@ -30,6 +35,85 @@ const payments = createPayments({
 });
 const rpcRates = new Map();
 
+const swaps = createSwapService();
+let drops;
+try {
+  drops = createDropService();
+} catch {
+  console.error("Reward storage could not be opened. Check MEDIA_DATA_DIR and disk permissions.");
+}
+let feed;
+try {
+  feed = createFeedService();
+} catch {
+  console.error("Community storage could not be opened. Check MEDIA_DATA_DIR and disk permissions.");
+}
+let roomServer;
+const rateBuckets = new Map();
+const tips = createTipsService({ videoReady: true, listParticipants: async (name) => roomServer?.listParticipants(name) || [] });
+
+async function handleTipsRequest(req, res, operation) {
+  try {
+    return sendJson(res, 200, await operation());
+  } catch (error) {
+    return sendJson(res, error.status || 503, {
+      error: error.status ? error.message : "Token payments are temporarily unavailable. Please try again later.",
+      ...(error.signature ? { signature: error.signature } : {}),
+      ...(error.intentId ? { intentId: error.intentId } : {}),
+      ...(error.confirmationStatus ? { confirmationStatus: error.confirmationStatus } : {}),
+    });
+  }
+}
+
+
+function readJson(req, maxBytes = 4096) {
+  return new Promise((resolveBody, reject) => {
+    let raw = "";
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(new Error("Request too large"));
+        req.destroy();
+        return;
+      }
+      raw += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolveBody(JSON.parse(raw || "{}"));
+      } catch {
+        reject(new Error("Invalid JSON"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function cleanRoom(value) {
+  const room = String(value || "").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(room)) return null;
+  return room;
+}
+
+function allowTokenRequest(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = String(forwarded || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+  const now = Date.now();
+  if (rateBuckets.size >= 10_000) {
+    for (const [address, bucket] of rateBuckets) if (now - bucket.started > 60_000) rateBuckets.delete(address);
+    if (!rateBuckets.has(ip) && rateBuckets.size >= 10_000) return false;
+  }
+  const prior = rateBuckets.get(ip);
+  if (!prior || now - prior.started > 60_000) {
+    rateBuckets.set(ip, { started: now, count: 1 });
+    return true;
+  }
+  prior.count += 1;
+  return prior.count <= 60;
+}
+
+
 function sendJson(res, status, value) {
   const body = JSON.stringify(value);
   res.writeHead(status, {
@@ -46,7 +130,7 @@ function securityHeaders() {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
-    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
   };
 }
 
@@ -56,7 +140,7 @@ async function marketData() {
   if (marketCache.expires > Date.now() && marketCache.value) return marketCache.value;
 
   try {
-    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`, {
+    const response = await serverFetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(7000),
     });
@@ -85,6 +169,11 @@ async function marketData() {
 
 async function handle(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  if (url.pathname === "/api/feed" || url.pathname.startsWith("/api/feed/")) {
+    if (req.method !== "GET" && !allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many feed requests. Please wait a minute and try again." });
+    if (!feed) return sendJson(res, 503, { error: "Community storage is unavailable. Please try again later." });
+    if (await feed.handle(req, res, url)) return;
+  }
   if (req.method === "GET" && url.pathname === "/healthz") return sendJson(res, 200, { ok: true });
 
   if (req.method === "GET" && url.pathname === "/api/config") {
@@ -100,6 +189,9 @@ async function handle(req, res) {
       iceServers,
       maxParticipants,
       payments: payments.config,
+      defaultRoom: cleanRoom(process.env.DEFAULT_LIVE_ROOM) || "juicy-live",
+      tips: tips.settings(), swaps: swaps.settings(), feedReady: Boolean(feed),
+      drops: drops?.config() || { ready: false, message: "Reward storage is unavailable." },
     });
   }
 
@@ -127,6 +219,50 @@ async function handle(req, res) {
       return sendJson(res, 400, { error: error.message || "Wallet request failed. Please try again." });
     }
   }
+
+  if (req.method === "GET" && url.pathname === "/api/swaps/config") return sendJson(res, 200, swaps.settings());
+  if (req.method === "GET" && (url.pathname === "/api/drops" || url.pathname === "/api/drops/config" || url.pathname.startsWith("/api/drops/status/"))) {
+    if (!drops) return sendJson(res, 503, { error: "Reward storage is unavailable. Please try again later." });
+    return handleTipsRequest(req, res, () => url.pathname === "/api/drops" ? drops.list() : url.pathname === "/api/drops/config" ? drops.config() : drops.status(url.pathname.slice("/api/drops/status/".length)));
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/wallet/")) {
+    if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many wallet requests. Please wait a minute and refresh." });
+    return handleTipsRequest(req, res, () => tips.getWallet(url.pathname.slice("/api/wallet/".length)));
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/streams/")) {
+    return handleTipsRequest(req, res, () => tips.getStream(url.pathname.slice("/api/streams/".length)));
+  }
+
+  if (req.method === "POST" && ["/api/tips/prepare", "/api/tips/submit", "/api/swaps/quote", "/api/swaps/prepare", "/api/swaps/submit", "/api/drops/challenge", "/api/drops/create", "/api/drops/approve", "/api/drops/prepare", "/api/drops/submit"].includes(url.pathname)) {
+    // Wallet signing never needs a cross-origin request to this application.
+    const origin = req.headers.origin;
+    if (origin) {
+      let originHost;
+      try { originHost = new URL(origin).host; } catch {}
+      if (originHost !== req.headers.host) return sendJson(res, 403, { error: "Open the payment form on this app to send tokens." });
+    }
+    if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many payment requests. Please wait a minute and try again." });
+    return handleTipsRequest(req, res, async () => {
+      let body;
+      try {
+        body = await readJson(req, 12_000);
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+      } catch {
+        throw Object.assign(new Error("Invalid payment request."), { status: 400 });
+      }
+      if (url.pathname === "/api/swaps/quote") return swaps.quote(body);
+      if (url.pathname === "/api/swaps/prepare") return swaps.prepare(body);
+      if (url.pathname === "/api/swaps/submit") return swaps.submit(body);
+      if (url.pathname.startsWith("/api/drops/")) {
+        if (!drops) throw Object.assign(new Error("Reward storage is unavailable."), { status: 503 });
+        return drops[url.pathname.slice("/api/drops/".length)](body, req.headers.host);
+      }
+      return url.pathname.endsWith("/prepare") ? tips.prepare(body) : tips.submit(body);
+    });
+  }
+
 
   if (req.method !== "GET" || url.pathname.startsWith("/api/")) return sendJson(res, 404, { error: "Not found" });
 
@@ -157,5 +293,5 @@ const server = http.createServer((req, res) => {
   });
 });
 
-attachRoomServer(server, { maxParticipants, validateWallet: walletAddress, verifyTip: payments.verifyTip });
+roomServer = attachRoomServer(server, { maxParticipants, validateWallet: walletAddress, verifyTip: payments.verifyTip });
 server.listen(PORT, "0.0.0.0", () => console.log(`Juicy Couture Coin live app listening on ${server.address().port}`));

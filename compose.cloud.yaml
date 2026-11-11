@@ -1,6 +1,10 @@
 # Supply the managed cloud proxy CA to the dependency installation step only.
 services:
   web:
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/secrets/proxy_ca
+    secrets:
+      - proxy_ca
     build:
       secrets:
         - proxy_ca

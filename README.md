@@ -10,7 +10,7 @@ separate media container is required.**
 
 ## Run locally
 
-Requires Node.js 20 or newer.
+Requires Node.js 24.22 or newer (the retained community feed and reward store use built-in SQLite).
 
 ```sh
 npm ci
@@ -85,8 +85,9 @@ use the supplied CA secret without changing TLS verification:
 docker compose -f compose.yaml -f compose.cloud.yaml up --build -d --wait --remove-orphans
 ```
 
-The cloud override mounts `CODEX_PROXY_CERT` only during dependency installation.
-It does not store that certificate in the image. To run a standalone image:
+The cloud override mounts `CODEX_PROXY_CERT` during dependency installation and
+as a read-only runtime trust certificate for outbound HTTPS. It does not store
+that certificate in the image or disable TLS verification. To run a standalone image:
 
 ```sh
 docker build -t juicy-live .
@@ -106,7 +107,7 @@ Node web service with these commands:
 - Health check: `/healthz`
 
 Keep one service instance: active room membership is held in that Node process.
-Render provides HTTPS and forwards the app's WebSocket endpoint. Video works
+Render provides HTTPS and forwards the app's WebSocket endpoint. The Blueprint retains the existing paid Starter plan and 2 GB persistent disk for community photos and reward records; Docker retains the community-data volume. Video works
 without setting any `LIVEKIT_*` variables; old values are ignored. Redeploy the
 latest commit and reload the page to replace an older credential-gated build.
 An app restart ends active rooms; participants can join again.
@@ -140,6 +141,8 @@ chat, camera/mic controls, leaving, rejoining, permission denial, responsive art
 and Phantom/MetaMask wallet approval against a local Solana RPC fixture. It starts its
 own Node process with no external ICE or blockchain service. Set `BROWSER_BASE_URL` to test an
 already running instance with `npm run test:browser -- e2e/video-room.spec.js e2e/design.spec.js`.
+The default channel is public. Watch live joins with camera and microphone off;
+Go live publishes and designates the room host.
 Wallet browser tests require the default local fixture and are skipped for an
 external BROWSER_BASE_URL. To use installed Chromium in Codex Cloud, set
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`.
@@ -155,9 +158,37 @@ The `$JCQ` ticker alone is not a verified on-chain identifier.
 The participation schedule is $2 CAD-value for verified breakfast attendance,
 up to $5 for helpful or positive participation, and up to $10 for community
 building. The highest approved tier per gathering applies; tiers do not stack.
-This app supports direct, wallet-approved tips. It does not trade, mint tokens,
-maintain custodial balances, or issue participation rewards. Reward distribution remains manual and inactive until the project has
+This app supports direct, wallet-approved tips. It does not mint tokens or maintain custodial balances. Optional swaps and host-approved reward drops are described below. Reward distribution remains manual and inactive until the project has
 published a working process. Crypto assets may lose all value.
+
+## Approved jobs and token drops
+
+Configure the public funding-wallet addresses in `REWARD_HOST_WALLETS` (comma-separated), the verified `TOKEN_MINT`, and a matching `SOLANA_CLUSTER`/RPC. These wallets are the only hosts allowed to create and approve drops. A connected authorized host sees the controls under **Rewards & drops**. The application never needs a host private key or seed phrase.
+
+1. Create a gathering or approved-job drop with a unique event code, title, and the **host-entered CAD value per token**. This is an explicit valuation snapshot, not an exchange-rate oracle or a promise of market value.
+2. Approve each recipient wallet and a reward tier, choosing a CAD amount up to that tier's cap. Approval automatically calculates and queues its token allocation using exact base units, rounding down rather than exceeding the approved CAD value. Approving a higher eligible tier replaces the previous allocation; amounts never stack for the same wallet and event code.
+3. Review the token drop: full recipients, amounts, mint, network, valuation, and funding wallet. Only **Approve payout in wallet** signs the actual on-chain transfer. Hosting a job, clicking approve, viewing a stream, or posting a photo never automatically spends tokens.
+
+Each drop supports up to five recipients in one atomic legacy SPL transaction. The host needs enough tokens and SOL for fees and any recipient-account creation. Only confirmed transactions mark rewards paid. Drop records and receipts persist in `drops.sqlite` on the same persistent volume as community posts. Pending or uncertain payments keep their signature and cannot be issued again, including after server restart. Use **Check payout status** to reconcile them. A prepared transaction that was never submitted can be reviewed again after its expiry and verified finalized block-height expiration; submitted or paid drops remain locked. Do not broadcast a prepared drop outside this application.
+
+Job completion and real-world attendance remain verified by hosts. Automation covers allocation math, queuing, and receipt reconciliation; each payout still requires the host's wallet transaction approval. A token mint, approved funding hosts, funded wallets, and working RPC access are prerequisites for real drops. Automated tests simulate chain responses and send no real tokens.
+
+
+## Community image feed
+
+Connect a Solana wallet, choose a JPEG, PNG, or WebP image up to 5 MiB, and add a caption of up to 500 characters. Posting prompts for a domain-bound, expiring sign-in message. This signature proves authorship and does not transfer coins or charge SOL. Posts are public, persist in SQLite and the media directory, and can be deleted by their author. Refresh or load more to see other community posts. There is no public profile password or server-held wallet key.
+
+The server verifies the signature, strips image metadata, resizes images to at most 2048 pixels, and stores sanitized WebP output. SVG and oversized images are rejected. Each wallet can create up to 10 posts per hour; deleting a post does not reset that limit. Storage is capped at 1 GiB of image data and 10,000 posts. Sessions expire after 24 hours and are cleared when the server restarts; posts remain. This is single-instance disk-backed storage; do not run multiple independent replicas against separate media folders. Back up the database and images together.
+
+
+## Swap SOL and tokens
+
+Set `JUPITER_API_KEY` securely on the server and use `SOLANA_CLUSTER=mainnet-beta` with a matching HTTPS RPC endpoint. Swaps call the official Jupiter `https://api.jup.ag/swap/v1` API. Permit `api.jup.ag` and your RPC host in outbound network settings; the public mainnet RPC host is `api.mainnet-beta.solana.com`. Managed environment proxy settings and inherited CA trust are respected. The API key and private RPC URL are never sent to browsers.
+
+In **Exchange in your wallet**, select SOL, USDC, the configured project mint, or another standard SPL mint with a supported direct route. Choose an amount and slippage tolerance, then get a quote. Review the full mints, wallet, estimated and minimum receive amounts, slippage, and expiration before choosing **Approve swap in wallet**. Swaps exchange tokens within that same connected wallet, whether the user is a viewer or streamer; they do not pay another user's wallet. Live-room tips use the current host-designated receiving wallet. The legacy shared-wallet API remains available for compatible clients. No live room is required for swapping.
+
+Only mainnet, exact-input swaps of standard SPL tokens with a verified direct route are supported. Token-2022, cross-chain swaps, unsupported instruction formats, and pairs without a verifiable route are rejected. Quotes last 30 seconds. The server binds every quote and transaction to its wallet, amounts, and mints, rejects altered signed transactions, and reports success only after confirmation. The app adds no swap fee; route fees and network fees still apply. If confirmation is uncertain, check the transaction signature before starting another swap. Automated tests use simulated Jupiter/RPC responses and do not move real funds.
+
 
 ## Privacy
 
@@ -185,4 +216,9 @@ published a working process. Crypto assets may lose all value.
 | `MAX_ROOM_PARTICIPANTS` | Room limit from 2 to 12; defaults to 8. |
 | `SOLANA_CLUSTER` | Solana mainnet-beta (default) or devnet for tipping. |
 | `SOLANA_RPC_URL` | Optional HTTPS RPC provider override; defaults to the cluster public RPC. Keep provider credentials server-side. |
+| `MEDIA_DATA_DIR` | Persistent community media and reward database directory; use a persistent disk or Docker volume. |
+| `JUPITER_API_KEY` | Optional server-only Jupiter key to enable retained swaps. |
+| `REWARD_HOST_WALLETS` | Optional comma-separated public wallets authorized to approve/fund reward drops. |
+| `STREAM_WALLET_ADDRESS` | Optional legacy shared-wallet API recipient. The main live-room UI uses the host-designated wallet. |
+| `DEFAULT_LIVE_ROOM` | Default public channel; juicy-live unless overridden. |
 | `ICE_SERVERS` | Optional JSON array of browser ICE server definitions to improve direct routes. Defaults to `[]`; the built-in relay works without it. Any supplied credentials must be browser-safe and short-lived. |

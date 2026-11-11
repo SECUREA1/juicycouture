@@ -15,8 +15,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:browser
 docker compose -f compose.yaml -f compose.cloud.yaml build
 ```
 
-Node 22 or newer, Chromium, and the managed Docker daemon are available in this
-environment. The platform supplies `CODEX_PROXY_CERT` for build-time trust. Keep
+Node 24.22 or newer, Chromium, and the managed Docker daemon are available in this
+environment. The platform supplies `CODEX_PROXY_CERT` for build-time and runtime HTTPS trust. Keep
 TLS and package integrity verification enabled. No video-service credentials,
 additional media server, database, or media ports are needed by the Node service.
 
@@ -63,3 +63,8 @@ api.mainnet-beta.solana.com (or api.devnet.solana.com when configured for devnet
 Those destinations were blocked by the managed network policy during setup.
 TOKEN_MINT remains blank and JCQ transfers disabled until official details exist.
 Hosts set their own receiving wallet through the Go live room controls.
+
+The merged community feed, optional swaps, and approved reward drops are retained.
+Docker uses the community-data volume; Render retains its existing Starter/2 GB
+persistent-disk configuration. Keep MEDIA_DATA_DIR on that durable storage.
+The full npm test command includes both test/ and tests/ suites.

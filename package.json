@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24.22.0"
   },
   "scripts": {
     "build": "node scripts/build.js",
     "start": "node server.js",
-    "test": "node --test test/*.test.js",
+    "test": "node --test test/*.test.js tests/*.test.js",
     "test:browser": "playwright test"
   },
   "dependencies": {
@@ -19,7 +19,11 @@
     "bs58": "6.0.0",
     "buffer": "6.0.3",
     "esbuild": "0.25.10",
-    "ws": "8.22.2"
+    "ws": "8.22.2",
+    "sharp": "0.35.5",
+    "tweetnacl": "1.0.3",
+    "undici": "7.30.2",
+    "@wallet-standard/features": "1.1.1"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0"

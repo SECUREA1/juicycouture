@@ -1,9 +1,9 @@
 import { getWallets } from '@wallet-standard/app';
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { getMint, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import bs58 from 'bs58';
 import { createTipTransaction, walletAddress } from './transactions.js';
-import { parseAmount } from './amounts.js';
+import { parseAmount, formatAmount } from './amounts.js';
 
 export function initWalletUI({ config, getRoom, send, onTip }) {
   const $ = (selector) => document.querySelector(selector);
@@ -15,6 +15,8 @@ export function initWalletUI({ config, getRoom, send, onTip }) {
   let unsubscribe = null;
   let review = null;
   let submitting = false;
+  let communityBusy = false;
+  const subscribers = new Set();
   const short = (address) => `${address.slice(0, 5)}…${address.slice(-5)}`;
   const status = (selector, message, error = false) => {
     const element = $(selector);
@@ -29,6 +31,8 @@ export function initWalletUI({ config, getRoom, send, onTip }) {
     $('#wallet-label').textContent = value ? short(value.address) : 'Connect wallet';
     $('#disconnect-wallet').hidden = !value;
     update();
+    for (const callback of subscribers) callback(getWallet());
+    void refreshBalances();
   }
   function providers(name) {
     const standard = registry.get().find((wallet) => wallet.name.toLowerCase().includes(name.toLowerCase())
@@ -155,7 +159,9 @@ export function initWalletUI({ config, getRoom, send, onTip }) {
     $('#host-name').textContent = host?.name || 'Your lovely host';
     $('#host-state').textContent = !host ? 'Join a hosted room to send a tip' : !host.online ? 'Host is offline' : host.wallet ? 'Live · receiving wallet designated' : 'Live · receiving wallet not set';
     $('#payout-address').textContent = host?.wallet || 'Not designated yet';
-    $('#review-tip').disabled = submitting || !connected || !host?.online || !host.wallet || connected.address === host.wallet;
+    $('#review-tip').disabled = submitting || communityBusy || !connected || !host?.online || !host.wallet || connected.address === host.wallet;
+    if ($('#wallet-refresh')) $('#wallet-refresh').disabled = !connected || submitting || communityBusy;
+    if ($('#wallet-copy-address')) $('#wallet-copy-address').disabled = !connected;
     $('#jcq-option').disabled = !config.payments.mint;
     $('#jcq-option').textContent = config.payments.mint ? 'JCQ' : 'JCQ · coming soon';
     $('#tip-network').textContent = config.payments.cluster === 'devnet' ? 'SOLANA DEVNET · TEST' : 'SOLANA MAINNET';
@@ -185,7 +191,7 @@ export function initWalletUI({ config, getRoom, send, onTip }) {
     } catch (error) { status('#tip-status', error.message, true); }
   });
   $('#approve-tip').addEventListener('click', async () => {
-    if (submitting || !review) return;
+    if (submitting || communityBusy || !review) return;
     const current = getRoom();
     if (!connected || connected.address !== review.sender || current?.code !== review.roomCode || !current.host?.online
       || current.host.wallet !== review.host.wallet || current.host.revision !== review.host.revision) {
@@ -258,8 +264,79 @@ export function initWalletUI({ config, getRoom, send, onTip }) {
       status('#tip-status', signature ? `${message} Check the existing receipt before retrying.` : message, true);
     } finally { submitting = false; $('#approve-tip').disabled = Boolean(signature); update(); }
   });
+  function getWallet() {
+    const current = connected;
+    if (!current) return null;
+    const requireCurrent = () => { if (connected !== current) throw new Error('Your connected wallet changed. Review the action again.'); };
+    const wallet = { address: current.address, cluster: config.payments.cluster,
+      async signTransaction(transaction) {
+        requireCurrent();
+        let signed;
+        if (current.standard?.features['solana:signTransaction']) {
+          const [result] = await current.standard.features['solana:signTransaction'].signTransaction({
+            transaction: transaction.serialize({ requireAllSignatures: false }), account: current.account, chain: config.payments.chain,
+          });
+          signed = transaction instanceof VersionedTransaction ? VersionedTransaction.deserialize(result.signedTransaction) : Transaction.from(result.signedTransaction);
+        } else if (current.legacy?.signTransaction) signed = await current.legacy.signTransaction(transaction);
+        else throw new Error('This wallet cannot sign this community transaction.');
+        requireCurrent(); return signed;
+      },
+    };
+    if (current.standard?.features['solana:signMessage'] || current.legacy?.signMessage) wallet.signMessage = async (message) => {
+      requireCurrent();
+      if (submitting || communityBusy) throw new Error('Finish the current wallet action first.');
+      communityBusy = true; update();
+      try {
+        let signature;
+        if (current.standard) {
+          const [result] = await current.standard.features['solana:signMessage'].signMessage({ message, account: current.account });
+          if (result.signedMessage.length !== message.length || message.some((byte, i) => byte !== result.signedMessage[i])) throw new Error('The signed message changed.');
+          signature = result.signature;
+        } else signature = (await current.legacy.signMessage(message, 'utf8')).signature;
+        requireCurrent(); return signature;
+      } finally { communityBusy = false; update(); }
+    };
+    return wallet;
+  }
+  async function withWalletLock(operation) {
+    if (submitting || communityBusy) throw new Error('Finish the current wallet action first.');
+    const wallet = getWallet(); if (!wallet) throw new Error('Connect a Solana wallet first.');
+    communityBusy = true; update();
+    try { return await operation(wallet); }
+    finally { communityBusy = false; update(); void refreshBalances(); }
+  }
+  async function refreshBalances() {
+    const current = connected;
+    if (!$('#wallet-sol-balance')) return;
+    if (!current) {
+      $('#wallet-sol-balance').textContent = '—'; $('#wallet-token-balance').textContent = '—';
+      $('#wallet-balance-status').textContent = 'Connect your wallet to view balances.'; return;
+    }
+    $('#wallet-balance-status').textContent = 'Reading your balance from Solana…';
+    try {
+      const sol = await rpc.getBalance(new PublicKey(current.address));
+      if (connected !== current) return;
+      $('#wallet-sol-balance').textContent = `${formatAmount(BigInt(sol), 9)} SOL`;
+      $('#wallet-token-balance').textContent = config.payments.mint ? 'Loading…' : 'JCQ details coming soon';
+      if (config.payments.mint) {
+        const mint = new PublicKey(config.payments.mint);
+        const result = await rpc.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, new PublicKey(current.address)));
+        if (connected !== current) return;
+        $('#wallet-token-balance').textContent = `${formatAmount(BigInt(result.value.amount), result.value.decimals)} JCQ`;
+      }
+      $('#wallet-balance-status').textContent = `Live balance · Solana ${config.payments.cluster}`;
+    } catch { if (connected === current) $('#wallet-balance-status').textContent = 'Live balance is unavailable. Check RPC connectivity, then refresh.'; }
+  }
+  $('#wallet-refresh')?.addEventListener('click', () => void refreshBalances());
+  $('#wallet-copy-address')?.addEventListener('click', async () => {
+    if (!connected) return;
+    try { await navigator.clipboard.writeText(connected.address); $('#wallet-balance-status').textContent = 'Wallet address copied.'; }
+    catch { $('#wallet-balance-status').textContent = connected.address; }
+  });
   update();
   return {
+    getWallet, withWalletLock, refresh: refreshBalances,
+    subscribe(callback) { subscribers.add(callback); callback(getWallet()); return () => subscribers.delete(callback); },
     update,
     confirmed(receipt) {
       const list = $('#tip-events'); list.querySelector('.activity-empty')?.remove();
