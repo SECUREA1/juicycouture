@@ -1,8 +1,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
-import { randomUUID } from "node:crypto";
-import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import { attachRoomServer } from "./rooms.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = resolve("public");
@@ -16,7 +15,10 @@ const MIME = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
 };
-const rateBuckets = new Map();
+const configuredLimit = Number(process.env.MAX_ROOM_PARTICIPANTS || 8);
+const maxParticipants = Math.min(12, Math.max(2, Number.isFinite(configuredLimit) ? Math.trunc(configuredLimit) : 8));
+const iceServers = process.env.ICE_SERVERS ? JSON.parse(process.env.ICE_SERVERS) : [];
+if (!Array.isArray(iceServers)) throw new Error("ICE_SERVERS must be a JSON array of WebRTC ICE servers.");
 let marketCache = { expires: 0, value: null };
 
 function sendJson(res, status, value) {
@@ -31,90 +33,12 @@ function sendJson(res, status, value) {
 }
 
 function securityHeaders() {
-  // Permit only the configured local WS origin for development. Production WSS
-  // endpoints are already covered by wss: in the connection policy.
-  let localVideoSource = "";
-  try {
-    const videoUrl = new URL(process.env.LIVEKIT_URL);
-    if (videoUrl.protocol === "ws:" && ["localhost", "127.0.0.1", "[::1]"].includes(videoUrl.hostname)) {
-      localVideoSource = ` ${videoUrl.origin} ${videoUrl.origin.replace(/^ws:/, "http:")}`;
-    }
-  } catch {}
   return {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
-    "content-security-policy": `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:${localVideoSource}; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`,
+    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
   };
-}
-
-function readJson(req, maxBytes = 4096) {
-  return new Promise((resolveBody, reject) => {
-    let raw = "";
-    let size = 0;
-    req.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > maxBytes) {
-        reject(new Error("Request too large"));
-        req.destroy();
-        return;
-      }
-      raw += chunk;
-    });
-    req.on("end", () => {
-      try {
-        resolveBody(JSON.parse(raw || "{}"));
-      } catch {
-        reject(new Error("Invalid JSON"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function cleanRoom(value) {
-  const room = String(value || "").trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(room)) return null;
-  return room;
-}
-
-function allowTokenRequest(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const ip = String(forwarded || req.socket.remoteAddress || "unknown").split(",")[0].trim();
-  const now = Date.now();
-  const prior = rateBuckets.get(ip);
-  if (!prior || now - prior.started > 60_000) {
-    rateBuckets.set(ip, { started: now, count: 1 });
-    return true;
-  }
-  prior.count += 1;
-  return prior.count <= 20;
-}
-
-function livekitConfigured() {
-  return Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
-}
-
-function livekitHttpUrl(raw) {
-  return String(raw).replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
-}
-
-async function ensureRoom(roomName) {
-  const service = new RoomServiceClient(
-    livekitHttpUrl(process.env.LIVEKIT_INTERNAL_URL || process.env.LIVEKIT_URL),
-    process.env.LIVEKIT_API_KEY,
-    process.env.LIVEKIT_API_SECRET,
-  );
-  let rooms = await service.listRooms([roomName]);
-  if (rooms.some((room) => room.name === roomName)) return;
-  const configuredLimit = Number(process.env.MAX_ROOM_PARTICIPANTS || 8);
-  const maxParticipants = Math.min(12, Math.max(2, Number.isFinite(configuredLimit) ? configuredLimit : 8));
-  try {
-    await service.createRoom({ name: roomName, maxParticipants, emptyTimeout: 600 });
-  } catch (error) {
-    rooms = await service.listRooms([roomName]).catch(() => []);
-    if (!rooms.some((room) => room.name === roomName)) throw error;
-  }
 }
 
 async function marketData() {
@@ -161,35 +85,16 @@ async function handle(req, res) {
       network: process.env.COIN_NETWORK || "Solana",
       mint: String(process.env.TOKEN_MINT || "").trim() || null,
       communityUrl: process.env.COMMUNITY_URL || null,
-      videoReady: livekitConfigured(),
+      videoReady: true,
+      videoMode: "peer-to-peer",
+      signalingPath: "/api/room",
+      iceServers,
+      maxParticipants,
     });
   }
 
   if (req.method === "GET" && url.pathname === "/api/market") {
     return sendJson(res, 200, await marketData());
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/room-token") {
-    if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many room requests. Please wait a minute and try again." });
-    if (!livekitConfigured()) return sendJson(res, 503, { error: "Live video is not configured yet. Add LiveKit credentials in the server environment." });
-    try {
-      const body = await readJson(req);
-      const room = cleanRoom(body.room);
-      const name = String(body.name || "").trim().replace(/[^\p{L}\p{N} ._'-]/gu, "").slice(0, 28);
-      if (!room) return sendJson(res, 400, { error: "Use a room code with 3–40 letters, numbers, or hyphens." });
-      if (!name) return sendJson(res, 400, { error: "Add a display name before joining." });
-      await ensureRoom(room);
-      const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
-        identity: randomUUID(),
-        name,
-        ttl: "15m",
-      });
-      token.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
-      return sendJson(res, 200, { token: await token.toJwt(), livekitUrl: process.env.LIVEKIT_URL, room, name });
-    } catch (error) {
-      console.error("Room token request failed:", error?.message || "unknown error");
-      return sendJson(res, 502, { error: "The video room could not be opened. Check the LiveKit settings and try again." });
-    }
   }
 
   if (req.method !== "GET" || url.pathname.startsWith("/api/")) return sendJson(res, 404, { error: "Not found" });
@@ -204,7 +109,7 @@ async function handle(req, res) {
     res.writeHead(200, {
       "content-type": MIME[extname(filePath)] || "application/octet-stream",
       "content-length": data.length,
-      "cache-control": filePath.endsWith("app.js") ? "public, max-age=300" : "no-cache",
+      "cache-control": "no-cache",
       ...securityHeaders(),
     });
     return res.end(data);
@@ -221,4 +126,5 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => console.log(`Juicy Couture Coin live app listening on ${PORT}`));
+attachRoomServer(server, { maxParticipants });
+server.listen(PORT, "0.0.0.0", () => console.log(`Juicy Couture Coin live app listening on ${server.address().port}`));

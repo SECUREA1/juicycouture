@@ -1,26 +1,27 @@
-import assert from 'node:assert/strict';
-import { RoomServiceClient, TokenVerifier } from 'livekit-server-sdk';
+import assert from "node:assert/strict";
+import { openRoomSocket } from "./room-socket.js";
 
-// Checks the local Compose development stack; never prints tokens or secrets.
-const base = 'http://127.0.0.1:3000';
-for (const path of ['/', '/styles.css', '/app.js', '/healthz']) {
+const base = process.env.BASE_URL || "http://127.0.0.1:3000";
+for (const path of ["/", "/styles.css", "/app.js", "/healthz"]) {
   assert.equal((await fetch(base + path)).status, 200, path);
 }
-const room = `smoke-${Date.now()}`;
-const service = new RoomServiceClient('http://127.0.0.1:7880', 'devkey', 'secret');
+const config = await (await fetch(base + "/api/config")).json();
+assert.equal(config.videoReady, true);
+assert.equal(config.videoMode, "peer-to-peer");
+const clients = [];
 try {
-  const response = await fetch(base + '/api/room-token', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ room, name: 'Smoke test' }),
-  });
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  const claims = await new TokenVerifier('devkey', 'secret').verify(body.token);
-  assert.equal(claims.video.room, room);
-  assert.equal(body.livekitUrl, 'ws://localhost:7880');
-  const rooms = await service.listRooms([room]);
-  assert.equal(rooms[0].maxParticipants, 8);
-  console.log('Compose assets, signed room token and LiveKit room creation: PASS');
+  const room = `smoke-${Date.now()}`;
+  for (const name of ["First tester", "Second tester"]) {
+    const client = await openRoomSocket(base);
+    clients.push(client);
+    client.send({ type: "join", room, name });
+    await client.next("joined");
+  }
+  clients[0].send({ type: "chat", text: "Built-in room chat works" });
+  assert.equal((await clients[1].next("chat")).text, "Built-in room chat works");
+  await clients[1].close();
+  await clients[0].next("peer-left");
+  console.log("App assets, credential-free room join, shared chat and leave: PASS");
 } finally {
-  await service.deleteRoom(room);
+  await Promise.all(clients.map((client) => client.close()));
 }

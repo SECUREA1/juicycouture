@@ -6,3 +6,6 @@ public
 !.env.example
 npm-debug.log*
 test
+e2e
+test-results
+playwright-report
