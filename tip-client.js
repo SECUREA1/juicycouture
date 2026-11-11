@@ -2,6 +2,7 @@ import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, decodeTransferCheckedInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
+import { createWalletRegistry } from "./wallet-connect.js";
 
 // Signing happens only in the user's wallet after an explicit form submission.
 export function initTips({ getRoom }) {
@@ -27,6 +28,94 @@ export function initTips({ getRoom }) {
   let balanceRequest = null;
   let balanceLoading = false;
   let balanceMessage = "Connect your Solana wallet to see your balance.";
+  const subscribers = new Set();
+  const registry = createWalletRegistry({ getCluster: () => stream?.cluster || settings?.cluster });
+  let adapters = registry.list();
+  let previousIdentity = "";
+
+  function getWallet() {
+    const cluster = stream?.cluster || settings?.cluster;
+    if (!provider || !address || !["mainnet-beta", "devnet"].includes(cluster)) return null;
+    const selectedProvider = provider;
+    const selectedAddress = address;
+    const requireCurrent = () => {
+      if (provider !== selectedProvider || address !== selectedAddress || (stream?.cluster || settings?.cluster) !== cluster || provider.publicKey?.toBase58?.() !== selectedAddress) {
+        throw new Error("Your wallet account or network changed. Review the action again.");
+      }
+    };
+    const wallet = {
+      address: selectedAddress,
+      cluster,
+      async signTransaction(transaction) {
+        requireCurrent();
+        const signed = await selectedProvider.signTransaction(transaction);
+        requireCurrent();
+        return signed;
+      },
+    };
+    if (selectedProvider.signMessage && selectedProvider.canSignMessage !== false) wallet.signMessage = async (message) => {
+      requireCurrent();
+      if (busy) throw new Error("Finish the current wallet action before signing in.");
+      busy = true;
+      render();
+      try {
+        const signature = await selectedProvider.signMessage(message);
+        requireCurrent();
+        return signature;
+      } finally {
+        busy = false;
+        render();
+      }
+    };
+    return wallet;
+  }
+
+  function notifyWallet() {
+    const wallet = getWallet();
+    const identity = wallet ? `${provider.id}:${wallet.address}:${wallet.cluster}` : "";
+    if (identity === previousIdentity) return;
+    previousIdentity = identity;
+    for (const callback of subscribers) callback(wallet);
+  }
+
+  function subscribe(callback) {
+    subscribers.add(callback);
+    callback(getWallet());
+    return () => subscribers.delete(callback);
+  }
+
+  async function withWalletLock(operation) {
+    if (busy) throw new Error("Finish the current wallet action first.");
+    const wallet = getWallet();
+    if (!wallet) throw new Error("Connect your Solana wallet first.");
+    busy = true;
+    render();
+    try { return await operation(wallet); }
+    finally {
+      busy = false;
+      render();
+      void refreshBalance();
+    }
+  }
+
+  registry.subscribe((discovered) => {
+    adapters = discovered;
+    const selected = els.wallet.value;
+    if (provider && !adapters.some((adapter) => adapter.id === provider.id)) {
+      const removed = provider;
+      resetWallet();
+      void Promise.resolve(removed.disconnect()).catch(() => {});
+      status("The selected wallet is no longer available. Connect another Solana wallet.");
+    }
+    els.wallet.replaceChildren(...adapters.map((adapter) => {
+      const option = document.createElement("option");
+      option.value = adapter.id;
+      option.textContent = adapter.name + (adapter.id.startsWith("standard-") ? " · Wallet Standard" : "");
+      return option;
+    }));
+    if (adapters.some((adapter) => adapter.id === selected)) els.wallet.value = selected;
+    else if (provider) els.wallet.value = provider.id;
+  });
 
   function amountError() {
     const amount = els.amount.value.trim();
@@ -50,7 +139,7 @@ export function initTips({ getRoom }) {
 
   function render() {
     const joined = Boolean(getRoom());
-    const details = stream || settings;
+    const details = { ...settings, ...stream };
     els.account.textContent = address || "No wallet connected";
     els.recipient.textContent = details?.recipient || "Not configured";
     els.mint.textContent = details?.mint || "Mint pending";
@@ -70,6 +159,7 @@ export function initTips({ getRoom }) {
     els.disconnect.disabled = busy || !address;
     els.amount.disabled = busy;
     els.checked.hidden = !uncertain;
+    notifyWallet();
   }
 
   async function request(path, options) {
@@ -104,7 +194,7 @@ export function initTips({ getRoom }) {
       try {
         const data = await request(`/api/wallet/${encodeURIComponent(walletAddress)}`);
         if (current !== balanceRevision || address !== walletAddress) return;
-        const details = stream || settings;
+        const details = { ...settings, ...stream };
         if (data.address !== walletAddress || (details?.mint && data.mint !== details.mint) ||
           (details?.cluster && data.cluster !== details.cluster) || !Number.isInteger(data.decimals) ||
           data.decimals < 0 || data.decimals > 255 || typeof data.tokenBalanceBaseUnits !== "string" || !/^\d+$/.test(data.tokenBalanceBaseUnits) ||
@@ -159,6 +249,7 @@ export function initTips({ getRoom }) {
   }
 
   function accountChanged(publicKey) {
+    previousIdentity = "";
     address = publicKey?.toBase58?.() || null;
     invalidateBalance();
     status(address ? "Wallet account changed. Review the recipient and amount before sending." : "Wallet disconnected.");
@@ -184,12 +275,8 @@ export function initTips({ getRoom }) {
   }
 
   els.connect.addEventListener("click", async () => {
-    const selected = els.wallet.value;
-    const candidate = selected === "solflare" ? window.solflare : window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
-    if (!candidate?.connect || !candidate?.signTransaction) {
-      status(`Open this page in ${selected === "solflare" ? "Solflare" : "Phantom"}'s browser or install its browser extension, then connect again.`, "error");
-      return;
-    }
+    const candidate = adapters.find((adapter) => adapter.id === els.wallet.value);
+    if (!candidate) return status("Choose an installed Solana wallet and try again.", "error");
     busy = true;
     render();
     try {
@@ -325,5 +412,5 @@ export function initTips({ getRoom }) {
     render();
   });
   setInterval(() => { if (getRoom() && !busy) void refresh(); }, 10_000);
-  return { refresh, disconnect };
+  return { refresh, disconnect, getWallet, subscribe, withWalletLock };
 }

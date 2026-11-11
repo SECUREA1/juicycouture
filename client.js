@@ -1,5 +1,7 @@
 import { Room, RoomEvent, Track } from "livekit-client";
 import { initTips } from "./tip-client.js";
+import { initFeed } from "./feed-client.js";
+import { initSwaps } from "./swap-client.js";
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -22,6 +24,8 @@ motionButton.addEventListener("click", () => {
   motionButton.textContent = paused ? "Resume motion" : "Pause motion";
 });
 const tips = initTips({ getRoom: () => room?.state === "connected" ? room.name : null });
+initFeed({ getWallet: tips.getWallet, subscribe: tips.subscribe });
+initSwaps({ getWallet: tips.getWallet, subscribe: tips.subscribe, withWalletLock: tips.withWalletLock, onConfirmed: tips.refresh });
 
 function resetRoomControls() {
   els.videos.replaceChildren();

@@ -9,6 +9,7 @@ import {
   unpackAccount,
 } from "@solana/spl-token";
 import bs58 from "bs58";
+import { serverFetch } from "./network.js";
 
 const INTENT_TTL_MS = 120_000;
 const MAX_INTENTS = 500;
@@ -80,7 +81,7 @@ export function createTipsService({ env = process.env, listParticipants, connect
     if (recipientText) recipient = walletAddress(recipientText, "Receiving wallet");
     const endpoint = env.SOLANA_RPC_URL || clusterApiUrl(cluster);
     if (new URL(endpoint).protocol !== "https:") throw new Error("RPC must use HTTPS");
-    rpc ||= new Connection(endpoint, "confirmed");
+    rpc ||= new Connection(endpoint, { commitment: "confirmed", fetch: serverFetch });
   } catch {
     configurationError = "Token payments have invalid Solana settings. Ask the app owner to check them.";
   }

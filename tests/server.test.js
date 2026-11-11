@@ -5,6 +5,9 @@ import { createServer } from "node:net";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Keypair } from "@solana/web3.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -19,6 +22,8 @@ async function freePort() {
 
 // Run `npm run build` first: these checks exercise the actual generated assets.
 test("HTTP app serves its build and rejects unavailable token payments", async (t) => {
+  const mediaDirectory = await mkdtemp(join(tmpdir(), "jcq-http-feed-"));
+  t.after(() => rm(mediaDirectory, { recursive: true, force: true }));
   const port = await freePort();
   const server = spawn(process.execPath, ["server.js"], {
     cwd: root,
@@ -32,6 +37,8 @@ test("HTTP app serves its build and rejects unavailable token payments", async (
       LIVEKIT_API_SECRET: "",
       SOLANA_CLUSTER: "devnet",
       SOLANA_RPC_URL: "",
+      JUPITER_API_KEY: "",
+      MEDIA_DATA_DIR: mediaDirectory,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -88,6 +95,26 @@ test("HTTP app serves its build and rejects unavailable token payments", async (
     assert.equal(config.videoReady, false);
     assert.equal(config.tips.ready, false);
     assert.equal(config.tips.recipient, null);
+    assert.equal(config.swaps.ready, false);
+    assert.equal(config.feedReady, true);
+  });
+
+  await t.test("public feed is available and signed-wallet login is required to post", async () => {
+    const response = await request("/api/feed");
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).posts, []);
+    const upload = await request("/api/feed/posts", { method: "POST", headers: { "content-type": "image/png" }, body: "not-an-image" });
+    assert.equal(upload.status, 401);
+  });
+
+  await t.test("unconfigured swaps fail closed and never expose API credentials", async () => {
+    const response = await request("/api/swaps/config");
+    assert.equal(response.status, 200);
+    const settings = await response.json();
+    assert.equal(settings.ready, false);
+    assert.equal(settings.apiKey, undefined);
+    const quote = await request("/api/swaps/quote", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    assert.equal(quote.status, 503);
   });
 
   await t.test("unconfigured streams stay inactive", async () => {

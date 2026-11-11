@@ -1,6 +1,6 @@
 # Juicy Couture Coin Live Hub
 
-A Render-ready Node app for the **Juicy Couture Coin** community project. It includes a Solana token dashboard, the official participation reward schedule, and a small-group live video lounge with text chat.
+A Render-ready Node app for the **Juicy Couture Coin** community project. It includes a Solana token dashboard, participation rewards, a permanent community photo feed, a live video lounge, and connected-wallet tips and token swaps.
 
 ## What it does
 
@@ -9,8 +9,10 @@ A Render-ready Node app for the **Juicy Couture Coin** community project. It inc
 - Offers a market-chart link only when market data returns a Solana pair.
 - Publishes the participation schedule: $2 CAD-value for verified breakfast attendance, up to $5 for helpful or positive participation, and up to $10 for community-building. The highest eligible tier per approved gathering applies; tiers do not stack.
 - Mints short-lived room access tokens on the server and uses LiveKit for browser video, audio, and in-room messages.
-- Lets viewers connect Phantom or Solflare and approve voluntary token tips to the app's configured stream wallet while a room is live.
-- Does not mint a token, make trades, hold wallet keys, or distribute participation rewards.
+- Connects compatible Solana Wallet Standard wallets, with Phantom and Solflare browser fallbacks, for viewers and streamers.
+- Supports wallet-approved tips to the shared streaming wallet and reviewed Jupiter swaps within the connected user's wallet.
+- Lets wallet-verified authors publish community images and delete their own posts.
+- Does not mint a token, hold wallet keys, or distribute participation rewards.
 
 The ticker is a project choice, not a unique on-chain identifier. Do not use `$JCQ` as a verified token until the token has been deployed and its full mint address has been published.
 
@@ -28,6 +30,8 @@ Render runs the web app and token endpoint. **LiveKit Cloud carries the live aud
 5. Wait for the Render deploy to finish, then open the generated `onrender.com` URL. Use `/healthz` to confirm the web process is responding.
 
 If LiveKit credentials are not set, the token dashboard still runs and the room explains that video setup is pending. The app never receives a wallet private key or seed phrase.
+
+The Blueprint now declares a **Starter plan and 2 GB persistent disk**, which are paid Render resources, for the permanent photo feed. Applying or syncing that Blueprint provisions hosting resources; committing it does not deploy them. `MEDIA_DATA_DIR=/var/data/community` keeps the database and images on that disk across app restarts and deployments. Keep backups of the whole directory. Do not deploy the permanent feed on an ephemeral filesystem. With Docker Compose, the `community-data` volume serves the same purpose.
 
 ## Add the token after deployment
 
@@ -64,17 +68,31 @@ Configure `TOKEN_MINT` with the full address of an existing **standard Solana SP
 
 Use `SOLANA_CLUSTER=devnet` with a devnet mint for testing, or `mainnet-beta` for real tokens. Optionally configure `SOLANA_RPC_URL` with a trusted HTTPS RPC provider for that same cluster. The endpoint stays on the server. Allow outbound access to that RPC host and your LiveKit host in your hosting environment. An RPC provider must support account lookups, recent blockhashes, transaction submission and confirmation. Mainnet tips move real tokens.
 
-Join a live lounge, connect Phantom or Solflare, enter a token amount, and review the full destination, mint, and network. Choose **Send tokens**, then approve the transaction in your wallet. The sender needs the selected token and enough SOL for transaction fees and, if necessary, the receiving wallet's token account. The server checks LiveKit for an unmuted video publication before both preparing and submitting the transfer. A stream can end after submission; a broadcast blockchain transfer cannot be cancelled by this app.
+Join a live lounge, connect a compatible Solana wallet, enter a token amount, and review the full destination, mint, and network. Choose **Send tokens**, then approve the transaction in your wallet. The sender needs the selected token and enough SOL for transaction fees and, if necessary, the receiving wallet's token account. The server checks LiveKit for an unmuted video publication before both preparing and submitting the transfer. A stream can end after submission; a broadcast blockchain transfer cannot be cancelled by this app.
 
 The wallet panel inside the app connects to the user's existing Solana wallet. It shows the configured token balance and SOL balance on the selected network, and provides the user's public receiving address to copy. Users can connect and check balances before joining a room; sending is available during an active stream. The panel reads the wallet's associated token account for this mint, which is also the account used for transfers. Coins held in other token accounts are not included. Refresh balances after funding the wallet.
 
-Private keys stay in Phantom or Solflare. This is a connected wallet interface; the app does not create custodial accounts, hold users' coins, or maintain internal coin credits. Failed balance lookups show an unavailable state rather than a zero balance. Token amounts are handled with exact base units and checked against available tokens before preparation. Frozen token accounts cannot send.
+Private keys stay in the user's wallet. Wallets must support Solana transaction signing; posting images additionally requires message signing. Ethereum-only and other incompatible wallets cannot sign Solana transactions. This is a connected wallet interface; the app does not create custodial accounts, hold users' coins, or maintain internal coin credits. Failed balance lookups show an unavailable state rather than a zero balance. Token amounts are handled with exact base units and checked against available tokens before preparation. Frozen token accounts cannot send.
 
 Only the wallet signs. The server constructs a checked token transfer for the configured mint and recipient, rejects changes to the prepared transaction, and reports success only after confirmation. If confirmation is uncertain, check the displayed transaction signature before sending again. A confirmed tip does not represent a reward payment or an entry in an app balance. There is no fee deducted for the app.
 
 Run `npm test` for payment validation and transaction tests. They use simulated chain and stream responses and never move funds. Real wallet, LiveKit, and RPC integration requires the settings above.
 
 The default test command targets `tests/` for this LiveKit application. The separate peer-to-peer fixtures under `test/` and `e2e/` expect a signaling implementation that is not wired into this server; they are retained from upstream and are not included in that command.
+
+## Community image feed
+
+Connect a Solana wallet, choose a JPEG, PNG, or WebP image up to 5 MiB, and add a caption of up to 500 characters. Posting prompts for a domain-bound, expiring sign-in message. This signature proves authorship and does not transfer coins or charge SOL. Posts are public, persist in SQLite and the media directory, and can be deleted by their author. Refresh or load more to see other community posts. There is no public profile password or server-held wallet key.
+
+The server verifies the signature, strips image metadata, resizes images to at most 2048 pixels, and stores sanitized WebP output. SVG and oversized images are rejected. Each wallet can create up to 10 posts per hour; deleting a post does not reset that limit. Storage is capped at 1 GiB of image data and 10,000 posts. Sessions expire after 24 hours and are cleared when the server restarts; posts remain. This is single-instance disk-backed storage; do not run multiple independent replicas against separate media folders. Back up the database and images together.
+
+## Swap SOL and tokens
+
+Set `JUPITER_API_KEY` securely on the server and use `SOLANA_CLUSTER=mainnet-beta` with a matching HTTPS RPC endpoint. Swaps call the official Jupiter `https://api.jup.ag/swap/v1` API. Permit `api.jup.ag` and your RPC host in outbound network settings; the public mainnet RPC host is `api.mainnet-beta.solana.com`. Managed environment proxy settings and inherited CA trust are respected. The API key and private RPC URL are never sent to browsers.
+
+In **Exchange in your wallet**, select SOL, USDC, the configured project mint, or another standard SPL mint with a supported direct route. Choose an amount and slippage tolerance, then get a quote. Review the full mints, wallet, estimated and minimum receive amounts, slippage, and expiration before choosing **Approve swap in wallet**. Swaps exchange tokens within that same connected wallet, whether the user is a viewer or streamer; they do not pay another user's wallet. Stream tips continue to use the shared app wallet. No live room is required for swapping.
+
+Only mainnet, exact-input swaps of standard SPL tokens with a verified direct route are supported. Token-2022, cross-chain swaps, unsupported instruction formats, and pairs without a verifiable route are rejected. Quotes last 30 seconds. The server binds every quote and transaction to its wallet, amounts, and mints, rejects altered signed transactions, and reports success only after confirmation. The app adds no swap fee; route fees and network fees still apply. If confirmation is uncertain, check the transaction signature before starting another swap. Automated tests use simulated Jupiter/RPC responses and do not move real funds.
 
 ## Privacy and launch notes
 
@@ -95,6 +113,8 @@ The default test command targets `tests/` for this LiveKit application. The sepa
 | `STREAM_WALLET_ADDRESS` | For tips | Public Solana wallet receiving tips for all rooms. Never enter a private key. |
 | `SOLANA_CLUSTER` | No | `mainnet-beta` (default) or `devnet`. |
 | `SOLANA_RPC_URL` | No | Server-only HTTPS RPC endpoint for the selected cluster. |
+| `JUPITER_API_KEY` | For swaps | Server-only API key for `api.jup.ag`; swaps require mainnet. |
+| `MEDIA_DATA_DIR` | For permanent posts | Persistent database/media folder; local default `.data/community`. |
 | `LIVEKIT_URL` | For video | LiveKit Cloud server URL. |
 | `LIVEKIT_API_KEY` | For video | LiveKit server-side API key. |
 | `LIVEKIT_API_SECRET` | For video | LiveKit server-side API secret. Keep secret. |

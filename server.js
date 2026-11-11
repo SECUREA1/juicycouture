@@ -4,6 +4,9 @@ import { extname, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createTipsService } from "./tips.js";
+import { createSwapService } from "./swaps.js";
+import { createFeedService } from "./feed.js";
+import { serverFetch } from "./network.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = resolve("public");
@@ -19,6 +22,13 @@ const MIME = {
 };
 const rateBuckets = new Map();
 let marketCache = { expires: 0, value: null };
+const swaps = createSwapService();
+let feed;
+try {
+  feed = createFeedService();
+} catch {
+  console.error("Community storage could not be opened. Check MEDIA_DATA_DIR and disk permissions.");
+}
 const tips = createTipsService({
   listParticipants: async (roomName) => {
     if (!livekitConfigured()) throw new Error("Live video is not configured.");
@@ -58,7 +68,7 @@ function securityHeaders() {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(self), microphone=(self), geolocation=()",
-    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
   };
 }
 
@@ -137,7 +147,7 @@ async function marketData() {
   if (marketCache.expires > Date.now() && marketCache.value) return marketCache.value;
 
   try {
-    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`, {
+    const response = await serverFetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(7000),
     });
@@ -166,6 +176,11 @@ async function marketData() {
 
 async function handle(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  if (url.pathname === "/api/feed" || url.pathname.startsWith("/api/feed/")) {
+    if (req.method !== "GET" && !allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many feed requests. Please wait a minute and try again." });
+    if (!feed) return sendJson(res, 503, { error: "Community storage is unavailable. Please try again later." });
+    if (await feed.handle(req, res, url)) return;
+  }
   if (req.method === "GET" && url.pathname === "/healthz") return sendJson(res, 200, { ok: true });
 
   if (req.method === "GET" && url.pathname === "/api/config") {
@@ -177,12 +192,16 @@ async function handle(req, res) {
       communityUrl: process.env.COMMUNITY_URL || null,
       videoReady: livekitConfigured(),
       tips: tips.settings(),
+      swaps: swaps.settings(),
+      feedReady: Boolean(feed),
     });
   }
 
   if (req.method === "GET" && url.pathname === "/api/market") {
     return sendJson(res, 200, await marketData());
   }
+
+  if (req.method === "GET" && url.pathname === "/api/swaps/config") return sendJson(res, 200, swaps.settings());
 
   if (req.method === "GET" && url.pathname.startsWith("/api/wallet/")) {
     if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many wallet requests. Please wait a minute and refresh." });
@@ -193,7 +212,7 @@ async function handle(req, res) {
     return handleTipsRequest(req, res, () => tips.getStream(url.pathname.slice("/api/streams/".length)));
   }
 
-  if (req.method === "POST" && ["/api/tips/prepare", "/api/tips/submit"].includes(url.pathname)) {
+  if (req.method === "POST" && ["/api/tips/prepare", "/api/tips/submit", "/api/swaps/quote", "/api/swaps/prepare", "/api/swaps/submit"].includes(url.pathname)) {
     // Wallet signing never needs a cross-origin request to this application.
     const origin = req.headers.origin;
     if (origin) {
@@ -210,6 +229,9 @@ async function handle(req, res) {
       } catch {
         throw Object.assign(new Error("Invalid payment request."), { status: 400 });
       }
+      if (url.pathname === "/api/swaps/quote") return swaps.quote(body);
+      if (url.pathname === "/api/swaps/prepare") return swaps.prepare(body);
+      if (url.pathname === "/api/swaps/submit") return swaps.submit(body);
       return url.pathname.endsWith("/prepare") ? tips.prepare(body) : tips.submit(body);
     });
   }

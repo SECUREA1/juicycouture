@@ -6,4 +6,9 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       MAX_ROOM_PARTICIPANTS: 8
+      MEDIA_DATA_DIR: /var/data/community
+    volumes:
+      - community-data:/var/data
     restart: unless-stopped
+volumes:
+  community-data:

@@ -2,6 +2,12 @@ services:
   - type: web
     name: juicy-couture-coin-live
     runtime: node
+    # Persistent community posts require a paid disk-capable service plan.
+    plan: starter
+    disk:
+      name: community-media
+      mountPath: /var/data
+      sizeGB: 2
     buildCommand: npm ci --no-audit --no-fund && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
@@ -28,3 +34,7 @@ services:
         sync: false
       - key: SOLANA_CLUSTER
         value: mainnet-beta
+      - key: MEDIA_DATA_DIR
+        value: /var/data/community
+      - key: JUPITER_API_KEY
+        sync: false
