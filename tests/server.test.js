@@ -105,6 +105,21 @@ test("HTTP app serves its build and rejects unavailable token payments", async (
     assert.match((await response.json()).error, /room code/i);
   });
 
+  await t.test("wallet balances require a configured mint and are never cached", async () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    const response = await request(`/api/wallet/${wallet}`);
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const result = await response.json();
+    assert.equal(typeof result.error, "string");
+    assert.equal(result.tokenBalance, undefined);
+  });
+
+  await t.test("invalid wallet addresses are rejected", async () => {
+    const response = await request("/api/wallet/not-a-wallet");
+    assert.equal(response.status, 400);
+  });
+
   await t.test("malformed payment JSON is rejected", async () => {
     const response = await request("/api/tips/prepare", {
       method: "POST",

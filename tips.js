@@ -6,6 +6,7 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
   getMint,
+  unpackAccount,
 } from "@solana/spl-token";
 import bs58 from "bs58";
 
@@ -36,6 +37,13 @@ export function parseTokenAmount(amount, decimals) {
   const units = BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");
   if (units <= 0n || units > U64_MAX) throw new TipError(400, "The token amount must be positive and within the token transfer limit.");
   return units;
+}
+
+export function formatTokenAmount(units, decimals) {
+  const digits = units.toString().padStart(decimals + 1, "0");
+  if (!decimals) return digits;
+  const fraction = digits.slice(-decimals).replace(/0+$/, "");
+  return digits.slice(0, -decimals) + (fraction ? `.${fraction}` : "");
 }
 
 function roomName(value) {
@@ -119,6 +127,51 @@ export function createTipsService({ env = process.env, listParticipants, connect
     return stream;
   }
 
+  async function verifiedMint() {
+    if (configurationError || !mint) throw new TipError(503, configurationError || "Wallet balances need a configured Solana token mint.");
+    let genesisHash;
+    try { genesisHash = await rpc.getGenesisHash(); }
+    catch { throw new TipError(503, "Could not verify the Solana network. Please try again later."); }
+    if (genesisHash !== GENESIS_HASHES[cluster]) throw new TipError(503, "The Solana RPC does not match the configured network.");
+    let token;
+    try { token = await getMint(rpc, mint, "confirmed", TOKEN_PROGRAM_ID); }
+    catch { throw new TipError(503, "Could not verify the configured SPL token mint. Ask the app owner to check its address and network."); }
+    if (!token.isInitialized) throw new TipError(503, "The configured token mint is not initialized.");
+    return token;
+  }
+
+  async function tokenAccount(wallet) {
+    const accountAddress = getAssociatedTokenAddressSync(mint, wallet);
+    try {
+      const info = await rpc.getAccountInfo(accountAddress, "confirmed");
+      if (info === null) return { amount: 0n, isFrozen: false, address: accountAddress.toBase58() };
+      const account = unpackAccount(accountAddress, info, TOKEN_PROGRAM_ID);
+      if (!account.isInitialized || !account.mint.equals(mint) || !account.owner.equals(wallet)) throw new Error();
+      return { amount: account.amount, isFrozen: account.isFrozen, address: accountAddress.toBase58() };
+    } catch {
+      throw new TipError(503, "Could not verify this wallet's token balance. Please try again later.");
+    }
+  }
+
+  async function getWallet(rawAddress) {
+    const wallet = walletAddress(rawAddress, "Wallet");
+    const token = await verifiedMint();
+    let account;
+    let lamports;
+    try {
+      [account, lamports] = await Promise.all([tokenAccount(wallet), rpc.getBalance(wallet, "confirmed")]);
+      if (!Number.isSafeInteger(lamports) || lamports < 0) throw new Error();
+    } catch {
+      throw new TipError(503, "Could not verify this wallet's balances. Please try again later.");
+    }
+    return {
+      address: wallet.toBase58(), mint: mint.toBase58(), recipient: recipient?.toBase58() || null,
+      cluster, symbol, decimals: token.decimals, tokenAccount: account.address,
+      tokenBalance: formatTokenAmount(account.amount, token.decimals), tokenBalanceBaseUnits: account.amount.toString(),
+      solBalance: formatTokenAmount(BigInt(lamports), 9), frozen: account.isFrozen,
+    };
+  }
+
   async function prepare({ room: rawRoom, sender: rawSender, amount } = {}) {
     const room = roomName(rawRoom);
     const sender = walletAddress(rawSender, "Sending wallet");
@@ -126,24 +179,11 @@ export function createTipsService({ env = process.env, listParticipants, connect
     if (sender.equals(recipient)) throw new TipError(400, "Connect a wallet different from the receiving wallet.");
     prune();
     if (intents.size >= MAX_INTENTS) throw new TipError(429, "There are too many pending payments. Please wait and try again.");
-    let genesisHash;
-    try {
-      genesisHash = await rpc.getGenesisHash();
-    } catch {
-      throw new TipError(503, "Could not verify the Solana network. No payment was prepared.");
-    }
-    if (genesisHash !== GENESIS_HASHES[cluster]) {
-      throw new TipError(503, "The Solana RPC does not match the configured network. No payment was prepared.");
-    }
-    let token;
-    try {
-      // getMint verifies the program owner and account layout. Token-2022 is not accepted.
-      token = await getMint(rpc, mint, "confirmed", TOKEN_PROGRAM_ID);
-    } catch {
-      throw new TipError(503, "Could not verify the configured SPL token mint. Ask the app owner to check its address and network.");
-    }
-    if (!token.isInitialized) throw new TipError(503, "The configured token mint is not initialized.");
+    const token = await verifiedMint();
     const units = parseTokenAmount(amount, token.decimals);
+    const account = await tokenAccount(sender);
+    if (account.isFrozen) throw new TipError(409, "This wallet's token account is frozen. No payment was prepared.");
+    if (units > account.amount) throw new TipError(400, "This wallet does not have enough available tokens for this payment.");
     let latest;
     try {
       latest = await rpc.getLatestBlockhash("confirmed");
@@ -222,5 +262,5 @@ export function createTipsService({ env = process.env, listParticipants, connect
     }
   }
 
-  return { settings, getStream, prepare, submit };
+  return { settings, getStream, getWallet, prepare, submit };
 }

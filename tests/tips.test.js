@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { MintLayout, MINT_SIZE, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, decodeTransferCheckedInstruction } from "@solana/spl-token";
+import { MintLayout, MINT_SIZE, AccountLayout, ACCOUNT_SIZE, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, decodeTransferCheckedInstruction } from "@solana/spl-token";
 import bs58 from "bs58";
-import { createTipsService, parseTokenAmount } from "../tips.js";
+import { createTipsService, parseTokenAmount, formatTokenAmount } from "../tips.js";
 
 function fixture(overrides = {}) {
   const sender = Keypair.generate();
@@ -16,10 +16,17 @@ function fixture(overrides = {}) {
     LIVEKIT_URL: "wss://example.livekit.cloud", LIVEKIT_API_KEY: "test-key", LIVEKIT_API_SECRET: "test-secret",
     ...overrides.env,
   };
-  const state = { active: true, owner: TOKEN_PROGRAM_ID, submissions: 0, confirmations: 0, confirmationError: null, sendError: null };
+  const state = { active: true, owner: TOKEN_PROGRAM_ID, balance: 18446744073709551615n, solLamports: 1234567890, frozen: false, accountMissing: false, accountProgram: TOKEN_PROGRAM_ID, accountWallet: sender.publicKey, accountMint: mint, submissions: 0, confirmations: 0, confirmationError: null, sendError: null };
   const connection = {
     getGenesisHash: async () => "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
-    getAccountInfo: async () => ({ data, owner: state.owner }),
+    getAccountInfo: async (address) => {
+      if (address.equals(mint)) return { data, owner: state.owner };
+      if (state.accountMissing) return null;
+      const accountData = Buffer.alloc(ACCOUNT_SIZE);
+      AccountLayout.encode({ mint: state.accountMint, owner: state.accountWallet, amount: state.balance, delegateOption: 0, delegate: PublicKey.default, state: state.frozen ? 2 : 1, isNativeOption: 0, isNative: 0n, delegatedAmount: 0n, closeAuthorityOption: 0, closeAuthority: PublicKey.default }, accountData);
+      return { data: accountData, owner: state.accountProgram };
+    },
+    getBalance: async () => state.solLamports,
     getLatestBlockhash: async () => ({ blockhash: Keypair.generate().publicKey.toBase58(), lastValidBlockHeight: 12345 }),
     sendRawTransaction: async (raw, options) => {
       assert.equal(options.skipPreflight, false);
@@ -188,4 +195,66 @@ test("expired intents cannot be broadcast", async () => {
   } finally {
     Date.now = realNow;
   }
+});
+
+test("wallet reports exact token and SOL amounts without requiring a stream or recipient", async () => {
+  const f = fixture({ env: { STREAM_WALLET_ADDRESS: "", LIVEKIT_URL: "", LIVEKIT_API_KEY: "", LIVEKIT_API_SECRET: "" } });
+  f.state.balance = 9007199254740993n;
+  const result = await f.service.getWallet(f.sender.publicKey.toBase58());
+  assert.equal(result.tokenBalance, "9007199254.740993");
+  assert.equal(result.tokenBalanceBaseUnits, "9007199254740993");
+  assert.equal(result.solBalance, "1.23456789");
+  assert.equal(result.address, f.sender.publicKey.toBase58());
+  assert.equal(result.recipient, null);
+  assert.equal(result.frozen, false);
+  assert.equal(formatTokenAmount(1n, 9), "0.000000001");
+  assert.equal(formatTokenAmount(1000000n, 6), "1");
+  assert.equal(formatTokenAmount(0n, 6), "0");
+  assert.equal(formatTokenAmount(100n, 0), "100");
+});
+
+test("a missing associated token account has a verified zero balance", async () => {
+  const f = fixture();
+  f.state.accountMissing = true;
+  f.state.solLamports = 0;
+  const result = await f.service.getWallet(f.sender.publicKey.toBase58());
+  assert.equal(result.tokenBalance, "0");
+  assert.equal(result.tokenBalanceBaseUnits, "0");
+  assert.equal(result.solBalance, "0");
+  await assert.rejects(f.prepare(), (error) => error.status === 400 && error.message.includes("enough"));
+});
+
+test("frozen and insufficient source token balances prevent preparation", async () => {
+  const f = fixture();
+  f.state.frozen = true;
+  assert.equal((await f.service.getWallet(f.sender.publicKey.toBase58())).frozen, true);
+  await assert.rejects(f.prepare(), (error) => error.status === 409 && error.message.includes("frozen"));
+  f.state.frozen = false;
+  f.state.balance = 1000000n;
+  await assert.rejects(f.prepare(), (error) => error.status === 400 && error.message.includes("enough"));
+  await f.prepare("1");
+  assert.equal(f.state.submissions, 0);
+});
+
+test("wallet reads validate addresses, cluster, token owner and token mint", async () => {
+  const f = fixture();
+  await assert.rejects(f.service.getWallet("not-a-wallet"), { status: 400 });
+  for (const mismatch of ["accountWallet", "accountMint"]) {
+    const original = f.state[mismatch];
+    f.state[mismatch] = Keypair.generate().publicKey;
+    await assert.rejects(f.service.getWallet(f.sender.publicKey.toBase58()), { status: 503 });
+    f.state[mismatch] = original;
+  }
+  f.state.accountProgram = TOKEN_2022_PROGRAM_ID;
+  await assert.rejects(f.service.getWallet(f.sender.publicKey.toBase58()), { status: 503 });
+  const wrongNetwork = fixture({ connection: { getGenesisHash: async () => "wrong-network" } });
+  await assert.rejects(wrongNetwork.service.getWallet(wrongNetwork.sender.publicKey.toBase58()), { status: 503 });
+});
+
+test("RPC failures never fabricate a zero wallet balance or leak provider secrets", async () => {
+  const f = fixture({ connection: { getBalance: async () => { throw new Error("https://rpc.example/?secret=private"); } } });
+  await assert.rejects(f.service.getWallet(f.sender.publicKey.toBase58()), (error) => error.status === 503 && !error.message.includes("private"));
+  const unsafe = fixture();
+  unsafe.state.solLamports = Number.MAX_SAFE_INTEGER + 1;
+  await assert.rejects(unsafe.service.getWallet(unsafe.sender.publicKey.toBase58()), { status: 503 });
 });

@@ -68,13 +68,20 @@
           <div class="room-toolbar"><span id="participants">Not connected</span><div><button id="toggle-mic" class="small-button" type="button" disabled aria-pressed="true">Mic on</button><button id="toggle-camera" class="small-button" type="button" disabled aria-pressed="true">Camera on</button><button id="leave-room" class="small-button leave" type="button" disabled>Leave</button></div></div>
           <div id="video-grid" class="video-grid" aria-live="polite"></div>
           <section class="tip-box" aria-labelledby="tip-heading">
-            <div class="tip-heading"><div><div class="card-eyebrow">Support the stream</div><h4 id="tip-heading">Send a little sparkle</h4></div><span aria-hidden="true">✦</span></div>
+            <div class="tip-heading"><div><div class="card-eyebrow">Your in-app wallet</div><h4 id="tip-heading">Send a little sparkle</h4></div><span aria-hidden="true">✦</span></div>
             <p id="tip-stream-state" class="tip-note">Join a live room to send tokens.</p>
             <div class="tip-wallet-row"><label for="tip-wallet">Your Solana wallet<select id="tip-wallet"><option value="phantom">Phantom</option><option value="solflare">Solflare</option></select></label><button id="tip-connect" class="small-button" type="button">Connect wallet</button><button id="tip-disconnect" class="small-button" type="button" disabled>Disconnect</button></div>
             <p id="tip-account" class="tip-account">No wallet connected</p>
+            <div class="wallet-overview" aria-label="Your wallet balance">
+              <dl class="wallet-balances"><div><dt>Your coin balance</dt><dd id="wallet-token-balance">—</dd></div><div><dt>Network fee balance</dt><dd id="wallet-sol-balance">—</dd></div></dl>
+              <div class="wallet-tools"><button id="wallet-refresh" class="small-button" type="button" disabled>Refresh balance</button><button id="wallet-copy-address" class="small-button" type="button" disabled>Copy my wallet address</button></div>
+              <p id="wallet-balance-status" class="tip-note" role="status">Connect your Solana wallet to see your balance.</p>
+              <p class="tip-note">Your coins stay in your connected wallet. Receive the token shown below and SOL at your address above, using the selected network. Then send coins to the streaming wallet below. Keep some SOL for fees.</p>
+            </div>
             <form id="tip-form">
-              <dl class="tip-details"><div><dt>Network</dt><dd id="tip-cluster">Not configured</dd></div><div><dt>Token mint · verify the full address</dt><dd><code id="tip-mint">Mint pending</code></dd></div><div><dt>Receiving stream wallet</dt><dd><code id="tip-recipient">Not configured</code></dd></div></dl>
+              <dl class="tip-details"><div><dt>Network</dt><dd id="tip-cluster">Not configured</dd></div><div><dt>Token mint · verify the full address</dt><dd><code id="tip-mint">Mint pending</code></dd></div><div><dt>Shared streaming wallet · receives your transfer</dt><dd><code id="tip-recipient">Not configured</code></dd></div></dl>
               <label class="tip-amount-label" for="tip-amount">Amount in tokens<input id="tip-amount" type="text" inputmode="decimal" maxlength="40" autocomplete="off" placeholder="0.00" aria-describedby="tip-fee-note"></label>
+              <p id="tip-amount-status" class="status error" role="status"></p>
               <p class="tip-review">You will send <strong><output id="tip-review-amount" for="tip-amount">0</output> tokens</strong> to the wallet shown above.</p>
               <p id="tip-fee-note" class="tip-note">Your wallet must hold this token and SOL for network fees. The first payment may also pay to create the receiving token account. Review the transaction in your wallet before approving.</p>
               <button id="tip-send" class="button" type="submit" disabled>Send tokens <span aria-hidden="true">♡</span></button>

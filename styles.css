@@ -15,3 +15,5 @@
 @media(prefers-reduced-motion:reduce){.hero-art *,.ribbon-track{animation:none!important}}
 
 @media(prefers-reduced-motion:reduce){.coin-image{animation:none!important}}
+
+.wallet-overview{margin:14px 0;padding:13px;border:1px solid #e8cbd7;border-radius:12px;background:rgba(255,255,255,.55)}.wallet-balances{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 12px}.wallet-balances dt{color:#7d5a6b;font-size:10px;font-weight:800}.wallet-balances dd{margin:5px 0;color:#571632;font-size:16px;font-weight:800;overflow-wrap:anywhere}.wallet-tools{display:flex;gap:7px;flex-wrap:wrap}.wallet-overview .tip-note{margin:10px 0 0}@media(max-width:420px){.wallet-balances{grid-template-columns:1fr}}

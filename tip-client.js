@@ -11,13 +11,37 @@ export function initTips({ getRoom }) {
     account: $("tip-account"), state: $("tip-stream-state"), recipient: $("tip-recipient"), mint: $("tip-mint"),
     cluster: $("tip-cluster"), amount: $("tip-amount"), review: $("tip-review-amount"), send: $("tip-send"),
     status: $("tip-status"), receipt: $("tip-receipt"), receiptLink: $("tip-receipt-link"), checked: $("tip-checked"),
+    balance: $("wallet-token-balance"), sol: $("wallet-sol-balance"), balanceStatus: $("wallet-balance-status"),
+    refreshBalance: $("wallet-refresh"), copyAddress: $("wallet-copy-address"),
+    amountStatus: $("tip-amount-status"),
   };
+  let settings = null;
   let stream = null;
   let provider = null;
   let address = null;
   let busy = false;
   let uncertain = false;
   let revision = 0;
+  let balance = null;
+  let balanceRevision = 0;
+  let balanceRequest = null;
+  let balanceLoading = false;
+  let balanceMessage = "Connect your Solana wallet to see your balance.";
+
+  function amountError() {
+    const amount = els.amount.value.trim();
+    if (!amount) return "Enter a token amount.";
+    if (!/^(0|[1-9]\d*)(\.\d+)?$/.test(amount)) return "Use digits and a decimal point for the token amount.";
+    if (!balance) return "Refresh your wallet balance before sending.";
+    if (balance.frozen) return "This token account is frozen and cannot send tokens.";
+    const [whole, fraction = ""] = amount.split(".");
+    if (fraction.length > balance.decimals) return `This token allows at most ${balance.decimals} decimal places.`;
+    const units = BigInt(whole) * 10n ** BigInt(balance.decimals) + BigInt(fraction.padEnd(balance.decimals, "0") || "0");
+    if (units <= 0n) return "Enter an amount greater than zero.";
+    if (units > BigInt(balance.tokenBalanceBaseUnits)) return "This amount exceeds your token balance.";
+    if (!/[1-9]/.test(balance.solBalance)) return "Your wallet needs SOL for network fees.";
+    return "";
+  }
 
   function status(message, kind = "pending") {
     els.status.textContent = message;
@@ -26,13 +50,21 @@ export function initTips({ getRoom }) {
 
   function render() {
     const joined = Boolean(getRoom());
+    const details = stream || settings;
     els.account.textContent = address || "No wallet connected";
-    els.recipient.textContent = stream?.recipient || "Not configured";
-    els.mint.textContent = stream?.mint || "Mint pending";
-    els.cluster.textContent = stream?.cluster === "devnet" ? "Solana devnet · test tokens" : stream?.cluster === "mainnet-beta" ? "Solana mainnet · real tokens" : "Not configured";
+    els.recipient.textContent = details?.recipient || "Not configured";
+    els.mint.textContent = details?.mint || "Mint pending";
+    els.cluster.textContent = details?.cluster === "devnet" ? "Solana devnet · test tokens" : details?.cluster === "mainnet-beta" ? "Solana mainnet · real tokens" : "Not configured";
+    els.balance.textContent = balance ? `${balance.tokenBalance} ${balance.symbol || "tokens"}` : "—";
+    els.sol.textContent = balance ? `${balance.solBalance} SOL` : "—";
+    els.balanceStatus.textContent = balanceMessage;
+    els.refreshBalance.disabled = busy || balanceLoading || !address;
+    els.copyAddress.disabled = !address;
     els.review.textContent = els.amount.value || "0";
     els.state.textContent = !joined ? "Join a live room to send tokens." : stream?.message || (stream?.active ? "Stream is live." : "Waiting for an active stream.");
-    els.send.disabled = busy || uncertain || !joined || !stream?.ready || !stream?.active || !address || !els.amount.value;
+    els.send.disabled = busy || uncertain || balanceLoading || !joined || !stream?.ready || !stream?.active || !address || Boolean(amountError());
+    els.amount.setCustomValidity(address && balance && els.amount.value ? amountError() : "");
+    els.amountStatus.textContent = address && balance && els.amount.value ? amountError() : "";
     els.connect.disabled = busy || Boolean(address);
     els.wallet.disabled = busy || Boolean(address);
     els.disconnect.disabled = busy || !address;
@@ -51,12 +83,59 @@ export function initTips({ getRoom }) {
     return data;
   }
 
+  function invalidateBalance() {
+    balanceRevision++;
+    balance = null;
+    balanceRequest = null;
+    balanceLoading = false;
+    balanceMessage = address ? "Refresh your wallet balance before sending." : "Connect your Solana wallet to see your balance.";
+  }
+
+  async function refreshBalance() {
+    if (!address) { invalidateBalance(); render(); return; }
+    if (balanceRequest?.address === address) return balanceRequest.promise;
+    const walletAddress = address;
+    const current = ++balanceRevision;
+    balance = null;
+    balanceLoading = true;
+    balanceMessage = "Loading your on-chain balance…";
+    render();
+    const promise = (async () => {
+      try {
+        const data = await request(`/api/wallet/${encodeURIComponent(walletAddress)}`);
+        if (current !== balanceRevision || address !== walletAddress) return;
+        const details = stream || settings;
+        if (data.address !== walletAddress || (details?.mint && data.mint !== details.mint) ||
+          (details?.cluster && data.cluster !== details.cluster) || !Number.isInteger(data.decimals) ||
+          data.decimals < 0 || data.decimals > 255 || typeof data.tokenBalanceBaseUnits !== "string" || !/^\d+$/.test(data.tokenBalanceBaseUnits) ||
+          typeof data.tokenBalance !== "string" || !/^\d+(\.\d+)?$/.test(data.tokenBalance) || typeof data.solBalance !== "string" || !/^\d+(\.\d+)?$/.test(data.solBalance) || typeof data.frozen !== "boolean") {
+          throw new Error("The wallet balance could not be verified. Refresh and try again.");
+        }
+        balance = data;
+        balanceMessage = data.frozen ? "This token account is frozen. Transfers are unavailable." : "Balance from Solana. Your wallet approves every transfer.";
+      } catch (error) {
+        if (current !== balanceRevision || address !== walletAddress) return;
+        balance = null;
+        balanceMessage = error.message || "Balance unavailable. Refresh and try again.";
+      } finally {
+        if (current === balanceRevision) {
+          balanceLoading = false;
+          balanceRequest = null;
+          render();
+        }
+      }
+    })();
+    balanceRequest = { address: walletAddress, promise };
+    return promise;
+  }
+
   async function refresh() {
     const roomName = getRoom();
     const current = ++revision;
     if (!roomName) {
       stream = null;
       render();
+      await refreshBalance();
       return;
     }
     try {
@@ -68,17 +147,23 @@ export function initTips({ getRoom }) {
       stream = { active: false, ready: false, message: "Stream status is unavailable. Sending is paused." };
     }
     render();
+    await refreshBalance();
   }
 
   function resetWallet() {
+    removeListeners();
+    provider = null;
     address = null;
+    invalidateBalance();
     render();
   }
 
   function accountChanged(publicKey) {
     address = publicKey?.toBase58?.() || null;
+    invalidateBalance();
     status(address ? "Wallet account changed. Review the recipient and amount before sending." : "Wallet disconnected.");
     render();
+    if (address) void refreshBalance();
   }
 
   function removeListeners() {
@@ -92,6 +177,7 @@ export function initTips({ getRoom }) {
     const oldProvider = provider;
     provider = null;
     address = null;
+    invalidateBalance();
     await Promise.resolve(oldProvider?.disconnect?.()).catch(() => {});
     status("Wallet disconnected.");
     render();
@@ -113,9 +199,11 @@ export function initTips({ getRoom }) {
       removeListeners();
       provider = candidate;
       address = key;
+      invalidateBalance();
       provider.on?.("accountChanged", accountChanged);
       provider.on?.("disconnect", resetWallet);
       status("Wallet connected. Review the token, receiving address, network, and amount below.", "success");
+      await refreshBalance();
     } catch (error) {
       status(error.code === 4001 ? "Wallet connection cancelled." : error.message || "Could not connect the wallet.", "error");
     } finally {
@@ -124,6 +212,14 @@ export function initTips({ getRoom }) {
     }
   });
   els.disconnect.addEventListener("click", disconnect);
+  els.refreshBalance.addEventListener("click", () => { void refreshBalance(); });
+  els.copyAddress.addEventListener("click", async () => {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address);
+      status("Your Solana wallet address is copied. Use the network shown below when receiving coins.", "success");
+    } catch { status("Copy your full wallet address shown above to receive coins."); }
+  });
   els.amount.addEventListener("input", render);
   els.checked.addEventListener("click", () => {
     uncertain = false;
@@ -172,6 +268,7 @@ export function initTips({ getRoom }) {
     const roomName = getRoom();
     const selectedProvider = provider;
     const expected = { ...stream, sender: address, amount: els.amount.value.trim() };
+    if (amountError()) { status(amountError(), "error"); return; }
     if (!/^\d+(\.\d+)?$/.test(expected.amount) || !/[1-9]/.test(expected.amount)) {
       status("Enter a token amount greater than zero without commas or exponent notation.", "error");
       return;
@@ -223,6 +320,10 @@ export function initTips({ getRoom }) {
   });
 
   render();
+  void request("/api/config").then((config) => { settings = config.tips; render(); }).catch(() => {
+    balanceMessage = "Wallet settings are unavailable. Reload the page to try again.";
+    render();
+  });
   setInterval(() => { if (getRoom() && !busy) void refresh(); }, 10_000);
   return { refresh, disconnect };
 }

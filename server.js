@@ -184,6 +184,11 @@ async function handle(req, res) {
     return sendJson(res, 200, await marketData());
   }
 
+  if (req.method === "GET" && url.pathname.startsWith("/api/wallet/")) {
+    if (!allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many wallet requests. Please wait a minute and refresh." });
+    return handleTipsRequest(req, res, () => tips.getWallet(url.pathname.slice("/api/wallet/".length)));
+  }
+
   if (req.method === "GET" && url.pathname.startsWith("/api/streams/")) {
     return handleTipsRequest(req, res, () => tips.getStream(url.pathname.slice("/api/streams/".length)));
   }
@@ -244,7 +249,7 @@ async function handle(req, res) {
     res.writeHead(200, {
       "content-type": MIME[extname(filePath)] || "application/octet-stream",
       "content-length": data.length,
-      "cache-control": filePath.endsWith("app.js") ? "public, max-age=300" : "no-cache",
+      "cache-control": "no-cache",
       ...securityHeaders(),
     });
     return res.end(data);

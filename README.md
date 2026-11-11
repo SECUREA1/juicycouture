@@ -66,6 +66,10 @@ Use `SOLANA_CLUSTER=devnet` with a devnet mint for testing, or `mainnet-beta` fo
 
 Join a live lounge, connect Phantom or Solflare, enter a token amount, and review the full destination, mint, and network. Choose **Send tokens**, then approve the transaction in your wallet. The sender needs the selected token and enough SOL for transaction fees and, if necessary, the receiving wallet's token account. The server checks LiveKit for an unmuted video publication before both preparing and submitting the transfer. A stream can end after submission; a broadcast blockchain transfer cannot be cancelled by this app.
 
+The wallet panel inside the app connects to the user's existing Solana wallet. It shows the configured token balance and SOL balance on the selected network, and provides the user's public receiving address to copy. Users can connect and check balances before joining a room; sending is available during an active stream. The panel reads the wallet's associated token account for this mint, which is also the account used for transfers. Coins held in other token accounts are not included. Refresh balances after funding the wallet.
+
+Private keys stay in Phantom or Solflare. This is a connected wallet interface; the app does not create custodial accounts, hold users' coins, or maintain internal coin credits. Failed balance lookups show an unavailable state rather than a zero balance. Token amounts are handled with exact base units and checked against available tokens before preparation. Frozen token accounts cannot send.
+
 Only the wallet signs. The server constructs a checked token transfer for the configured mint and recipient, rejects changes to the prepared transaction, and reports success only after confirmation. If confirmation is uncertain, check the displayed transaction signature before sending again. A confirmed tip does not represent a reward payment or an entry in an app balance. There is no fee deducted for the app.
 
 Run `npm test` for payment validation and transaction tests. They use simulated chain and stream responses and never move funds. Real wallet, LiveKit, and RPC integration requires the settings above.
