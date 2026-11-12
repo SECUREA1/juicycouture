@@ -1,7 +1,13 @@
+import { initSections } from "./sections-client.js";
+
+initSections();
+
 import { initFeed } from "./feed-client.js";
+import { initTickers } from "./ticker-client.js";
 import { initSwaps } from "./swap-client.js";
 import { initDrops } from "./drops-client.js";
 import { initWalletUI } from "./wallet-ui.js";
+import { initExperience } from "./experience-client.js";
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -16,6 +22,13 @@ let room = null;
 let walletUI = null;
 let micOn = false;
 let cameraOn = false;
+const experience = initExperience({ onLeave: () => leaveRoom() });
+
+function updateExperience() {
+  experience.room({ connected: Boolean(room?.id && !room.closed), code: room?.code,
+    participants: room ? room.peers.size + 1 : 0, host: room?.host,
+    camera: cameraOn, microphone: micOn });
+}
 
 function setStatus(element, message, kind = "") {
   element.textContent = message;
@@ -30,6 +43,7 @@ function normalizeRoom(raw) {
 function makeInvite(roomName) {
   const invite = new URL(location.href);
   invite.searchParams.set("room", roomName);
+  invite.hash = "live-room";
   return invite.toString();
 }
 function savedHostKey(roomName) {
@@ -47,25 +61,32 @@ function markHostTiles() {
   }
 }
 function hearts(count = 6) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const layer = $("#hearts-layer");
+  if (document.body.classList.contains('motion-paused') || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const layer = $("#panel-live").hidden || $("#live-room").dataset.view === 'chat' ? $("#global-celebration") : $("#hearts-layer");
   for (let i = 0; i < count && layer.children.length < 36; i++) {
     const heart = document.createElement("span"); heart.className = "floating-heart"; heart.textContent = i % 4 === 0 ? "✧" : "♡";
     heart.style.setProperty("--left", `${15 + Math.random() * 70}%`);
     heart.style.setProperty("--drift", `${Math.random() * 100 - 50}px`);
     heart.style.animationDelay = `${i * 0.08}s`; layer.append(heart); heart.addEventListener("animationend", () => heart.remove());
+    setTimeout(() => heart.remove(), 6500);
   }
 }
 async function loadConfig() {
   const response = await fetch("/api/config", { cache: "no-store" });
   if (!response.ok) throw new Error("Could not load the lounge settings. Refresh to try again.");
   config = await response.json();
+  experience.config(config);
   els.coinName.textContent = config.coinName;
+  $("#coin-symbol").textContent = `$${config.coinSymbol || 'JCQ'}`;
+  $("#network").textContent = config.network || 'Solana';
+  $("#mint-address").textContent = config.mint || 'Pending deployment';
+  $("#launch-status").textContent = config.mint ? 'Mint configured · verify full address' : 'Solana coin · mint pending';
   if (!new URLSearchParams(location.search).get("room")) els.room.value = config.defaultRoom || "juicy-live";
   if (config.communityUrl) {
     try { const url = new URL(config.communityUrl); if (url.protocol === "https:") { els.communityLink.href = url; els.communityLink.hidden = false; } } catch {}
   }
-  walletUI = initWalletUI({ config, getRoom: () => room, send: (message) => room ? sendRoom(room, message) : false, onTip: () => hearts(15) });
+  walletUI = initWalletUI({ config, getRoom: () => room, send: (message) => room ? sendRoom(room, message) : false, onTip: () => { experience.tip(); hearts(15); } });
+  walletUI.subscribe(wallet => experience.wallet(wallet));
   initFeed({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe });
   initSwaps({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });
   initDrops({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });
@@ -84,12 +105,14 @@ function addChatLine(name, message, mine = false) {
   els.chatMessages.append(row);
   if (els.chatMessages.children.length > 100) els.chatMessages.firstElementChild.remove();
   els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+  experience.message({ mine });
 }
 
 function updateParticipants() {
   if (!room) return;
   const total = room.peers.size + 1;
   els.participants.textContent = `${total} ${total === 1 ? "person" : "people"} here`;
+  updateExperience();
 }
 
 function addVideoTile(identity, label, stream, local = false) {
@@ -339,6 +362,7 @@ function disposeRoom(session) {
   cameraOn = false;
   els.participants.textContent = "Not connected";
   els.roomTitle.textContent = "Your lounge is waiting";
+  updateExperience();
 }
 
 function connectRoom(session, name, roomName) {
@@ -373,6 +397,7 @@ function connectRoom(session, name, roomName) {
           session.name = message.self.name;
           session.isHost = message.self.isHost;
           session.host = message.host;
+          updateExperience();
           if (message.hostKey) { try { sessionStorage.setItem(`jcq-host:${roomName}`, message.hostKey); } catch {} }
           walletUI?.update();
           for (const peer of message.peers) addPeer(session, peer);
@@ -389,6 +414,7 @@ function connectRoom(session, name, roomName) {
           if (peer) { Object.assign(peer, message.peer); updateMedia(peer); }
         } else if (message.type === "host-updated") {
           session.host = message.host;
+          updateExperience();
           markHostTiles(); walletUI?.update();
         } else if (message.type === "tip-confirmed") {
           walletUI?.confirmed(message);
@@ -481,7 +507,7 @@ function leaveRoom() {
 
 els.join.addEventListener("click", () => joinRoom(false));
 els.hostStart.addEventListener("click", () => joinRoom(true));
-$("#hero-host").addEventListener("click", () => setTimeout(() => els.displayName.focus(), 250));
+$("#hero-host")?.addEventListener("click", () => setTimeout(() => els.displayName.focus(), 250));
 els.love.addEventListener("click", () => { if (room) sendRoom(room, { type: "reaction" }); });
 els.leave.addEventListener("click", leaveRoom);
 els.mic.addEventListener("click", () => {
@@ -492,6 +518,7 @@ els.mic.addEventListener("click", () => {
   els.mic.setAttribute("aria-pressed", String(micOn));
   updateMedia({ id: room.id, name: room.name, camera: cameraOn, microphone: micOn });
   sendRoom(room, { type: "media", camera: cameraOn, microphone: micOn });
+  updateExperience();
 });
 els.camera.addEventListener("click", () => {
   if (!room) return;
@@ -501,6 +528,7 @@ els.camera.addEventListener("click", () => {
   els.camera.setAttribute("aria-pressed", String(cameraOn));
   updateMedia({ id: room.id, name: room.name, camera: cameraOn, microphone: micOn });
   sendRoom(room, { type: "media", camera: cameraOn, microphone: micOn });
+  updateExperience();
 });
 els.copy.addEventListener("click", async () => {
   try {
@@ -521,4 +549,5 @@ els.chatForm.addEventListener("submit", (event) => {
 window.addEventListener("pagehide", () => { if (room) disposeRoom(room); });
 
 els.room.value = roomFromUrl();
+initTickers();
 loadConfig().catch((error) => setStatus(els.roomStatus, error.message, "error"));

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("artwork loads at desktop and phone sizes without horizontal overflow", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");

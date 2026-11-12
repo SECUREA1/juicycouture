@@ -12,6 +12,7 @@ export function initFeed({ getWallet, subscribe } = {}) {
     form: $("feed-form"), image: $("feed-image"), caption: $("feed-caption"),
     submit: $("feed-submit"), status: $("feed-status"), posts: $("feed-posts"),
     more: $("feed-load-more"), auth: $("feed-auth-status"),
+    refresh: $("feed-refresh"),
   };
   const posts = new Map();
   let nextCursor = null;
@@ -65,6 +66,8 @@ export function initFeed({ getWallet, subscribe } = {}) {
     els.image.disabled = busy;
     els.caption.disabled = busy;
     els.more.disabled = loading || busy;
+    els.refresh.disabled = loading || busy;
+    for (const button of els.posts.querySelectorAll('.feed-delete')) button.disabled = loading || busy;
     els.more.hidden = nextCursor === null;
   }
 
@@ -150,6 +153,7 @@ export function initFeed({ getWallet, subscribe } = {}) {
       card.append(image, content);
       els.posts.append(card);
     }
+    if (loaded) document.dispatchEvent(new CustomEvent('jcq:feed', { detail: { count: els.posts.querySelectorAll('.feed-card').length, more: nextCursor !== null } }));
     controls();
   }
 
@@ -169,8 +173,12 @@ export function initFeed({ getWallet, subscribe } = {}) {
       nextCursor = page.nextCursor;
       loaded = true;
       renderPosts();
+      setStatus(posts.size ? 'Community photos are up to date. Refresh to check for more moments.' : 'The gallery is ready for its first community photo.');
     } catch (error) {
-      if (!destroyed) setStatus(error.message, "error");
+      if (!destroyed) {
+        setStatus(error.message, "error");
+        document.dispatchEvent(new CustomEvent('jcq:feed-error'));
+      }
     } finally {
       loading = false;
       if (!destroyed) controls();
@@ -190,6 +198,7 @@ export function initFeed({ getWallet, subscribe } = {}) {
       checkWallet(wallet.address, revision);
       await request(`/api/feed/posts/${post.id}`, { method: "DELETE", headers: { "x-post-wallet": wallet.address } });
       posts.delete(post.id);
+      document.dispatchEvent(new CustomEvent('jcq:feed-changed'));
       setStatus("Your image post was deleted.", "success");
     } catch (error) {
       setStatus(error.code === 4001 ? "Wallet sign-in cancelled. The post was not deleted." : error.message, "error");
@@ -226,6 +235,7 @@ export function initFeed({ getWallet, subscribe } = {}) {
         method: "POST", headers: { "content-type": file.type, "x-post-caption": encodeURIComponent(caption), "x-post-wallet": wallet.address }, body: file,
       });
       posts.set(post.id, post);
+      document.dispatchEvent(new CustomEvent('jcq:feed-changed'));
       loaded = true;
       els.image.value = "";
       els.caption.value = "";
@@ -250,7 +260,9 @@ export function initFeed({ getWallet, subscribe } = {}) {
 
   els.form.addEventListener("submit", onSubmit);
   const onMore = () => { void load(true); };
+  const onRefresh = () => { void load(); };
   els.more.addEventListener("click", onMore);
+  els.refresh.addEventListener("click", onRefresh);
   const unsubscribe = subscribe?.(walletChanged);
   controls();
   void load();
@@ -261,6 +273,7 @@ export function initFeed({ getWallet, subscribe } = {}) {
       walletRevision++;
       els.form.removeEventListener("submit", onSubmit);
       els.more.removeEventListener("click", onMore);
+      els.refresh.removeEventListener("click", onRefresh);
       if (typeof unsubscribe === "function") unsubscribe();
     },
   };

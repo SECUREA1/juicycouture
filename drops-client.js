@@ -263,6 +263,7 @@ export function initDrops({
     );
   }
   function renderList() {
+    document.dispatchEvent(new CustomEvent('jcq:drops', { detail: { count: drops.length } }));
     els.list.replaceChildren();
     if (!drops.length)
       els.list.append(
@@ -367,6 +368,7 @@ export function initDrops({
       );
       renderList();
     } catch (error) {
+      if (!destroyed) document.dispatchEvent(new CustomEvent('jcq:drops-error'));
       if (!destroyed)
         setStatus(
           els.status,

@@ -47,7 +47,7 @@ for (const name of ["Phantom", "MetaMask"]) test(`${name} approves an exact host
     const host = await hostContext.newPage(), guest = await guestContext.newPage();
     const room = `tips-${name.toLowerCase()}-${Date.now()}`;
     for (const [page, display, selector] of [[host, "Lovely Host", "#host-room"], [guest, "Lovely Viewer", "#join-room"]]) {
-      await page.goto("/");
+      await page.goto("/#live-room");
       await expect(page.locator(selector)).toBeEnabled();
       await page.locator("#display-name").fill(display);
       await page.locator("#room-code").fill(room);
@@ -65,12 +65,15 @@ for (const name of ["Phantom", "MetaMask"]) test(`${name} approves an exact host
     await expect(guest.locator("#wallet-label")).toContainText(payer.publicKey.toBase58().slice(0, 5));
     expect(signed).toHaveLength(0);
     await expect(guest.locator("#jcq-option")).toBeDisabled();
+    await guest.locator('[data-panel="tips"]').click();
     await guest.locator("#review-tip").click();
     await expect(guest.locator("#tip-review")).toContainText(receiver);
     await expect(guest.locator("#tip-review")).toContainText("devnet");
     expect(signed).toHaveLength(0);
     await guest.locator("#approve-tip").click();
     await expect(guest.locator("#tip-events")).toContainText("sent 0.01 SOL");
+    await expect(guest.locator("#tips-count-summary")).toHaveText("1 tip");
+    await expect(guest.locator("#global-celebration .floating-heart")).not.toHaveCount(0);
     await expect(host.locator("#tip-events")).toContainText("sent 0.01 SOL");
     expect(signed).toHaveLength(1);
     expect(signed[0].toPubkey.toBase58()).toBe(receiver);
@@ -78,6 +81,7 @@ for (const name of ["Phantom", "MetaMask"]) test(`${name} approves an exact host
     await expect(guest.locator("#tip-receipt")).toHaveAttribute("href", /explorer\.solana\.com\/tx\/.*cluster=devnet/);
 
     // A recipient change invalidates an already-open review before signing.
+    await guest.locator('[data-panel="tips"]').click();
     await guest.locator("#review-tip").click();
     const different = Keypair.generate().publicKey.toBase58();
     await host.locator("#host-wallet").fill(different);
@@ -94,7 +98,7 @@ test("an Ethereum-only MetaMask connection is not used for Solana payments", asy
     window.ethereumCalls = 0;
     window.ethereum = { isMetaMask: true, request: () => { window.ethereumCalls++; } };
   });
-  await page.goto("/");
+  await page.goto("/#live-room");
   await page.locator("#connect-wallet").click();
   await page.getByRole("button", { name: /MetaMask/ }).click();
   await expect(page.locator("#wallet-status")).toContainText("Solana support was not detected");
@@ -109,18 +113,26 @@ test("the shared connected wallet can sign in, post and delete a community photo
   await mockWallet(context, "Phantom", Keypair.generate(), signed);
   try {
     const page = await context.newPage();
-    await page.goto("/");
+    await page.goto("/#live-room");
     await expect(page.locator("#join-room")).toBeEnabled();
     await page.locator("#connect-wallet").click();
     await page.getByRole("button", { name: /Phantom/ }).click();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#eab1ca" } }).png().toBuffer();
+    await page.locator('[data-panel="feed"]').click();
     await page.locator("#feed-image").setInputFiles({ name: "community.png", mimeType: "image/png", buffer: image });
     await page.locator("#feed-caption").fill("A lovely shared moment");
     await page.locator("#feed-submit").click();
+    await expect(page.locator("#feed-posts")).toContainText("A lovely shared moment");
+    await expect(page.locator("#feed-count-summary")).toHaveText("1 photo loaded");
+    await expect(page.locator("#activity-track")).toContainText("A lovely shared moment");
+    await page.locator("#feed-refresh").click();
+    await expect(page.locator("#feed-status")).toContainText("up to date");
     await expect(page.locator("#feed-posts")).toContainText("A lovely shared moment");
     expect(signed).toHaveLength(0);
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator(".feed-delete").first().click();
     await expect(page.locator("#feed-posts")).not.toContainText("A lovely shared moment");
+    await expect(page.locator("#activity-track")).not.toContainText("A lovely shared moment");
+    await expect(page.locator("#feed-count-summary")).toHaveText("0 photos loaded");
   } finally { await context.close(); }
 });

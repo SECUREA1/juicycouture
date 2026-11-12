@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 async function join(page, name, room) {
-  await page.goto("/");
+  await page.goto("/#live-room");
   await expect(page.locator("#join-room")).toBeEnabled();
   await page.locator("#display-name").fill(name);
   await page.locator("#room-code").fill(room);
@@ -90,7 +90,7 @@ test("camera denial gives a useful message and allows another join attempt", asy
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => { throw new DOMException("Denied", "NotAllowedError"); };
   });
-  await page.goto("/");
+  await page.goto("/#live-room");
   await page.locator("#display-name").fill("Permission test");
   await expect(page.locator("#join-room")).toBeEnabled();
   await page.locator("#join-with-media").check();

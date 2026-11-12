@@ -8,6 +8,7 @@ RUN --mount=type=secret,id=proxy_ca \
     npm ci --no-audit --no-fund
 COPY scripts ./scripts
 COPY feed-client.js swap-client.js drops-client.js browser-globals.js crown.svg ./
+COPY sections-client.js ticker-client.js experience-client.js app-experience.css ./
 COPY client.js wallet-ui.js transactions.js amounts.js index.html styles.css audio-worklet.js coin-medallion.jpeg juicy-banner.jpeg ./
 COPY assets ./assets
 RUN npm run build && npm prune --omit=dev --ignore-scripts --offline --no-audit --no-fund
