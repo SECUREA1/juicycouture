@@ -1,6 +1,6 @@
 const CONTEXT = {
   coin: 'The coin · Story, official details, and launch readiness.',
-  rewards: 'Rewards · Choose a reward card and review real host-approved drops.',
+  rewards: 'Juicy Journey · Care, Help, and Build through verified contributions.',
   live: 'Live lounge · Stream, watch, and chat in your room.',
   feed: 'Community feed · Browse photos or share a moment with your wallet.',
   tips: 'Tipping & wallet · Support the current host and review your wallet activity.',
@@ -64,10 +64,11 @@ export function initExperience({ onLeave }) {
     text('feed-count-summary', `${count}${more ? '+' : ''} ${count === 1 && !more ? 'photo' : 'photos'} loaded`);
   });
   document.addEventListener('jcq:feed-error', () => text('feed-count-summary', 'Photos unavailable · try refreshing'));
-  document.addEventListener('jcq:drops', event => {
-    text('rewards-drops-summary', `${event.detail.count} ${event.detail.count === 1 ? 'drop' : 'drops'}`);
+  document.addEventListener('jcq:program', event => {
+    const data = event.detail;
+    text('rewards-status-summary', data.reviewReady ? 'Independent reviewer verification' : 'Reviewer setup pending');
+    text('rewards-drops-summary', data.total === null ? 'Connect a wallet' : `${data.total} Spark ${data.total === 1 ? 'stamp' : 'stamps'}`);
   });
-  document.addEventListener('jcq:drops-error', () => text('rewards-drops-summary', 'Schedule unavailable'));
   async function checkHealth() {
     if (healthBusy || stopped || document.hidden) return;
     healthBusy = true;
@@ -88,7 +89,6 @@ export function initExperience({ onLeave }) {
       text('coin-ticker-summary', `$${config.coinSymbol || 'JCQ'} · intended`);
       text('coin-network-summary', config.network || 'Solana');
       text('coin-mint-summary', config.mint ? 'Configured · verify exact mint below' : 'Mint pending');
-      text('rewards-status-summary', config.drops?.ready ? 'Host review & wallet approval' : config.mint ? 'Host setup pending' : 'Token setup pending');
       text('feed-storage-summary', config.feedReady ? 'Public photo feed available' : 'Photo feed unavailable');
     },
     wallet(wallet) {

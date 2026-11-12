@@ -39,10 +39,9 @@ export function initSections() {
   window.addEventListener('hashchange', () => fromLocation(true));
   window.addEventListener('popstate', () => fromLocation());
   const rewards = {
-    breakfast: ['🥐 Sweet Start · activity badge', 'Breakfast Bloom', '$2 CAD value in coin', 'Verified breakfast attendance at an approved community gathering. Say hello, share a meal, and be part of the moment.'],
-    helping: ['♡ Helping Heart · participation badge', 'Helping Hands', 'Up to $5 CAD value in coin', 'Useful event help, welcoming a new face, and lending a hand at an approved gathering.'],
-    vibes: ['✦ Good Vibes · participation badge', 'Good Vibes', 'Up to $5 CAD value in coin', 'Respectful participation, encouragement, and positive, constructive engagement.'],
-    community: ['♛ Crown Builder · community badge', 'Community Builder', 'Up to $10 CAD value in coin', 'Organizing activities, connecting people, and helping the real-life community grow.'],
+    care: ['♡ Care · People first', 'Make someone feel supported.', 'A helpful outcome, not just a hello.', 'Help a newcomer take their first useful step, or follow through on an agreed need. Explain what changed and how you checked it helped.'],
+    help: ['✦ Help · Useful work', 'Make the next step easier.', 'A finished task, not a promise to help.', 'Complete an agreed practical task, or teach someone to do it independently. Record the result and how it was checked.'],
+    build: ['♛ Build · Lasting value', 'Leave something others can use.', 'A lasting result, not a bigger crowd.', 'Publish a resource another member actually uses, or coordinate a shared project through to a delivered result.'],
   };
   for (const button of document.querySelectorAll('[data-reward]')) button.addEventListener('click', () => {
     const values = rewards[button.dataset.reward];

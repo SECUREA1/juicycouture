@@ -8,6 +8,7 @@ import { createTipsService } from "./tips.js";
 import { createSwapService } from "./swaps.js";
 import { createFeedService } from "./feed.js";
 import { createDropService } from "./drops.js";
+import { createProgramService } from "./program.js";
 import { serverFetch } from "./network.js";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -36,6 +37,12 @@ const payments = createPayments({
 const rpcRates = new Map();
 
 const swaps = createSwapService();
+let program;
+try {
+  program = createProgramService();
+} catch {
+  console.error("Contribution recognition storage could not be opened. Check MEDIA_DATA_DIR and disk permissions.");
+}
 let drops;
 try {
   drops = createDropService();
@@ -169,6 +176,10 @@ async function marketData() {
 
 async function handle(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  if (url.pathname === "/api/program" || url.pathname.startsWith("/api/program/")) {
+    if (!program) return sendJson(res, 503, { error: "Contribution recognition is temporarily unavailable." });
+    if (await program.handle(req, res, url)) return;
+  }
   if (url.pathname === "/api/feed" || url.pathname.startsWith("/api/feed/")) {
     if (req.method !== "GET" && !allowTokenRequest(req)) return sendJson(res, 429, { error: "Too many feed requests. Please wait a minute and try again." });
     if (!feed) return sendJson(res, 503, { error: "Community storage is unavailable. Please try again later." });

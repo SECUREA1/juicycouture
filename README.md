@@ -1,7 +1,7 @@
 # Juicy Couture Coin Live Hub
 
 A Node app for the Juicy Couture Coin community: a Solana token dashboard,
-participation reward information, and small-group video rooms with text chat.
+contribution recognition, and small-group video rooms with text chat.
 
 Video uses the browser's built-in media support. The same Node process serves
 the page, connects room members over WebSocket, and relays chat and media when
@@ -147,7 +147,7 @@ Wallet browser tests require the default local fixture and are skipped for an
 external BROWSER_BASE_URL. To use installed Chromium in Codex Cloud, set
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`.
 
-## Token dashboard and rewards
+## Token dashboard and Juicy Journey
 
 `TOKEN_MINT` starts blank. The dashboard shows launch-pending status until an
 actual verified Solana mint is configured. Then it polls DexScreener through the
@@ -155,13 +155,39 @@ server every 30 seconds and displays a Solana pair if one exists. This requires
 outbound HTTPS to `api.dexscreener.com`. Data can be delayed or unavailable.
 The `$JCQ` ticker alone is not a verified on-chain identifier.
 
-The participation schedule is $2 CAD-value for verified breakfast attendance,
-up to $5 for helpful or positive participation, and up to $10 for community
-building. The highest approved tier per gathering applies; tiers do not stack.
-This app supports direct, wallet-approved tips. It does not mint tokens or maintain custodial balances. Optional swaps and host-approved reward drops are described below. Reward distribution remains manual and inactive until the project has
-published a working process. Crypto assets may lose all value.
+Juicy Journey recognizes community care and useful outcomes rather than attendance,
+spending, or a dollar-value schedule. Six missions span three equal paths:
 
-## Approved jobs and token drops
+- **Care:** help a newcomer complete a useful first step; follow through on a need.
+- **Help:** finish an agreed practical task; teach someone to complete a task independently.
+- **Build:** publish a resource another member uses; coordinate a project through delivery.
+
+Each distinct approved mission earns one permanent, non-transferable **Spark stamp**
+per wallet. Spark requires one mission; Charm requires three distinct missions across
+at least two paths; Crown requires all six missions across all three paths. Repeating
+the same mission, joining a room, chatting, attending, tipping, or holding tokens does
+not add stamps. Titles are recognition only, with no cash value, token entitlement,
+privileges, or promised perks.
+
+A connected wallet signs a domain-bound message to submit a public outcome note.
+An authorized reviewer in `REWARD_HOST_WALLETS` separately signs a review explaining
+how the outcome meets the published criteria. Reviewers cannot approve their own
+submissions. A requested change can be addressed by resubmitting the same mission;
+an approved mission cannot earn a second stamp. Recognition persists in
+`program.sqlite` under `MEDIA_DATA_DIR`, independent of a token mint or chain RPC.
+Use a persistent volume and back up the database alongside the other community data.
+
+Contributions can queue while no reviewer is configured, but remain pending.
+The program does not infer identity across wallets; reviewers must check the
+underlying contribution rather than treating additional wallet addresses as new work.
+Contribution notes, review notes, and wallet addresses are public. Keep private
+member information out of the notes. Catalog/progress are available at `/api/program`;
+`/api/program/challenge` and `/api/program/actions` accept signed recognition actions.
+All recognition actions use message signatures, never token transactions.
+
+## Legacy token drops · separate payout compatibility
+
+These earlier CAD-based payout tools remain in a collapsed legacy section. They do not determine Juicy Journey recognition or award Spark stamps. Existing prepared transactions, records, and receipts keep their original meaning.
 
 Configure the public funding-wallet addresses in `REWARD_HOST_WALLETS` (comma-separated), the verified `TOKEN_MINT`, and a matching `SOLANA_CLUSTER`/RPC. These wallets are the only hosts allowed to create and approve drops. A connected authorized host sees the controls under **Rewards & drops**. The application never needs a host private key or seed phrase.
 
@@ -218,7 +244,7 @@ Only mainnet, exact-input swaps of standard SPL tokens with a verified direct ro
 | `SOLANA_RPC_URL` | Optional HTTPS RPC provider override; defaults to the cluster public RPC. Keep provider credentials server-side. |
 | `MEDIA_DATA_DIR` | Persistent community media and reward database directory; use a persistent disk or Docker volume. |
 | `JUPITER_API_KEY` | Optional server-only Jupiter key to enable retained swaps. |
-| `REWARD_HOST_WALLETS` | Optional comma-separated public wallets authorized to approve/fund reward drops. |
+| `REWARD_HOST_WALLETS` | Comma-separated public wallets authorized to review Juicy Journey contributions and manage legacy token drops. No private keys are needed. |
 | `STREAM_WALLET_ADDRESS` | Optional legacy shared-wallet API recipient. The main live-room UI uses the host-designated wallet. |
 | `DEFAULT_LIVE_ROOM` | Default public channel; juicy-live unless overridden. |
 | `ICE_SERVERS` | Optional JSON array of browser ICE server definitions to improve direct routes. Defaults to `[]`; the built-in relay works without it. Any supplied credentials must be browser-safe and short-lived. |

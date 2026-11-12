@@ -8,6 +8,7 @@ import { initSwaps } from "./swap-client.js";
 import { initDrops } from "./drops-client.js";
 import { initWalletUI } from "./wallet-ui.js";
 import { initExperience } from "./experience-client.js";
+import { initProgram } from "./program-client.js";
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -87,6 +88,7 @@ async function loadConfig() {
   }
   walletUI = initWalletUI({ config, getRoom: () => room, send: (message) => room ? sendRoom(room, message) : false, onTip: () => { experience.tip(); hearts(15); } });
   walletUI.subscribe(wallet => experience.wallet(wallet));
+  initProgram({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock });
   initFeed({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe });
   initSwaps({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });
   initDrops({ getWallet: walletUI.getWallet, subscribe: walletUI.subscribe, withWalletLock: walletUI.withWalletLock, onConfirmed: walletUI.refresh });

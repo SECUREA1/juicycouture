@@ -9,6 +9,7 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY scripts ./scripts
 COPY feed-client.js swap-client.js drops-client.js browser-globals.js crown.svg ./
 COPY sections-client.js ticker-client.js experience-client.js app-experience.css ./
+COPY program-client.js program.css ./
 COPY client.js wallet-ui.js transactions.js amounts.js index.html styles.css audio-worklet.js coin-medallion.jpeg juicy-banner.jpeg ./
 COPY assets ./assets
 RUN npm run build && npm prune --omit=dev --ignore-scripts --offline --no-audit --no-fund
@@ -19,6 +20,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node package.json server.js rooms.js payments.js transactions.js amounts.js tips.js swaps.js feed.js drops.js network.js ./
+COPY --chown=node:node program.js ./
 RUN mkdir -p /var/data/community && chown -R node:node /var/data
 VOLUME ["/var/data"]
 USER node

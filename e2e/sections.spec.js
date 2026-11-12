@@ -7,9 +7,9 @@ test('restored coin page, section toggles, reward preview and back navigation', 
   await expect(page.locator('#panel-live')).toBeHidden();
   await page.locator('[data-panel="rewards"]').click();
   await expect(page.locator('#panel-coin')).toBeHidden();
-  await page.locator('[data-reward="community"]').click();
-  await expect(page.locator('#preview-value')).toHaveText('Up to $10 CAD value in coin');
-  await expect(page.locator('[data-reward="breakfast"]')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('[data-reward="build"]').click();
+  await expect(page.locator('#preview-value')).toHaveText('A lasting result, not a bigger crowd.');
+  await expect(page.locator('[data-reward="care"]')).toHaveAttribute('aria-pressed', 'false');
   await page.goBack();
   await expect(page.locator('#panel-coin')).toBeVisible();
   await page.getByRole('link', { name: 'FAQ', exact: true }).click();
